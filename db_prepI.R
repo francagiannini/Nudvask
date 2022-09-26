@@ -2,6 +2,8 @@ library(tidyverse)
 library(lubridate)
 library(readxl)
 
+getwd()
+
 ## dongs ---- 
 # several tratments/experimentals 
 
@@ -51,19 +53,19 @@ jyndevad_conc <- jyndevad_conc |>
 #[,-1]
 ## nkonc ----
 
-guldborg_conc <-read.table("data/guldborg_nkonc2015_2018.txt",
+guldborg_conc <-read.table("data_raw/guldborg_nkonc2015_2018.txt",
                            sep = "\t", header = T) |> 
   mutate(No3_N=as.numeric(ifelse(No3_N<0,0,No3_N)),
          date=dmy(date)) |> 
   rename('knoc' ='No3_N')
 
-jyndevad_conc_2 <-read.table("data/jyderup_nkonc2017_2018.txt",
+jyndevad_conc_2 <-read.table("data_raw/jyderup_nkonc2017_2018.txt",
                              sep = "\t", header = T)|> 
   mutate(No3_N=as.numeric(ifelse(No3_N<0,0,No3_N)),
          date=dmy(date)) |> 
   rename('knoc' ='No3_N')
 
-virk_conc <- read.table("data/Virk_N_nkonc2015_2018.txt",
+virk_conc <- read.table("data_raw/Virk_N_nkonc2015_2018.txt",
                         sep = "\t", header = T)|> 
   mutate(no3n=as.numeric(ifelse(no3n<0,0,no3n)),
          date=lubridate::make_date(day=Dato, month=mm, year=yy)
@@ -71,15 +73,17 @@ virk_conc <- read.table("data/Virk_N_nkonc2015_2018.txt",
   rename('knoc' ='no3n',
          'sted' ='NLES5')
 
-ytteborg_conc <- read.table("data/Ytteborg_nkonc281118.txt",
+ytteborg_conc <- read.table("data_raw/Ytteborg_nkonc281118.txt",
                             sep = "\t", header = T) |> 
   mutate(date=lubridate::make_date(day=dd, month=mm, year=yy))
 
-nknoc <- read.table("data/nkonc_mean217.txt",
+nknoc <- read.table("data_raw/nkonc_mean217.txt",
                     sep = "\t", header = T) |> 
   mutate(knoc=as.numeric(ifelse(knoc<0,0,knoc))) |> 
   drop_na(knoc)|> 
   mutate(date=lubridate::make_date(day=day, month=month, year=year))
+
+#nknoc has sted from 1 to 2445
 
 # summary(nknoc)
 # summary(virk_conc)
@@ -102,3 +106,8 @@ names2 <- read_excel("data_raw/masterNLESS_Franka100822.xls",
   select(strno, StedNavn)|> unique()
 
 names <- bind_rows(names1, names2) |> unique()
+
+names_sum <- names |> group_by(StedNavn) |> 
+  summarize(n=n(),
+            minID=min(strno),
+            maxID=max(strno))
