@@ -124,7 +124,8 @@ wea_c |>
   ggplot(aes(x = month, fill = as.factor(drain_day))) +
   geom_bar(position = "fill")+
   scale_x_continuous(breaks = seq(1,12,1))+
-  theme_bw()
+  theme_bw()+
+  ylab("Proportion")
 
 
 hist(wea_c$drain_day)
@@ -255,100 +256,4 @@ c_mess_master <- merge(c_mess_site,
 #write.table(c_mess_master,"c_mess_master.txt", sep="\t")
 
 #*** Start II ***  -----
-
-#### first explore -----
-c_mess_measure <- c_mess_master |> 
-  filter(measure_grp==TRUE) 
-  
-#c_mess_site |> 
-c_mess_measure|> 
-  #dplyr::filter(site_eng =="\"Flakkebjerg\"") |> 
-  ggplot(aes(x = day_leach, y = newconc)) +
-  geom_point() +
-  geom_smooth(method = "loess", se = F) +
-  #coord_cartesian(ylim = c(0,0.9)) +
-  theme(panel.grid = element_blank()) +
-  #facet_wrap(~harvest_year.x, nrow=4,scales = "free_y")+
-  #scale_x_continuous(breaks = seq(1,12,1))+
-  theme_bw()
-
-jul_day_plot <- c_mess_measure |> 
-  dplyr::filter(site_eng =="\"Flakkebjerg\"") |> 
-  ggplot(aes(x = yday(date), y = newconc)) +
-  geom_point() +
-  geom_smooth(method = "loess", se = F) +
-  theme(panel.grid = element_blank()) +
-  #facet_wrap(~site_eng, nrow=4,scales = "free_y")+
-  scale_x_continuous(breaks = seq(1,366,11))+
-  labs(y="Concenration", x="Julian day")+
-  theme_bw()
-
-harv_day_plot <- c_mess_measure |> 
-  dplyr::filter(site_eng =="\"Flakkebjerg\"") |> 
-  ggplot(aes(x = day_harv, y = newconc)) +
-  geom_point() +
-  geom_smooth(method = "loess", se = F) +
-  #coord_cartesian(ylim = c(0,0.9)) +
-  theme(panel.grid = element_blank()) +
-  #facet_wrap(~site_eng, nrow=4,scales = "free_y")+
-  scale_x_continuous(breaks = seq(1,366,11))+
-  labs(y="Concenration", x="Leaching day from april")+
-  theme_bw()
-
-leach_day_plot <- c_mess_measure |> 
-  dplyr::filter(site_eng =="\"Foulum\"") |> 
-  ggplot(aes(x = day_leach, y = newconc)) +
-  geom_point() +
-  geom_smooth(method = "loess", se = F) +
-  #coord_cartesian(ylim = c(0,0.9)) +
-  theme(panel.grid = element_blank()) +
-  #facet_wrap(~site_eng, nrow=4,scales = "free_y")+
-  scale_x_continuous(breaks = seq(1,366,11))+
-  labs(y="Concenration", x="Leaching day from aug")+
-  theme_bw()
-
-c_mess_measure |> ggplot()+
-  geom_histogram(aes(x=newconc#log(newconc)
-                     ,position="identity"), 
-                 colour = "black"#,bins=20
-  )+
-  # geom_histogram(aes(x=newconc,position="identity"), 
-  #                colour = "white"#,bins=20
-  # )+
-  #stat_density(geom = "line", aes(colour = "bla"))+
-  ylab("Count")+ xlab("daily concentration" )+
-  geom_rug() +
-  theme_bw()
-
-
-c_mess_measure |> ggplot(aes(x = year, y = sted))+
-  geom_count(col="tomato3", show.legend=F)+
-  scale_x_continuous(breaks=seq(1989,2018,1))+
-  #scale_y_continuous(breaks=unique(c_mess_measure$sted))+
-  theme_bw()
-
-library(lme4)
-
-VCA<-lme4::lmer(
-  newconc~1+(1|month)+(1|year)+(1|M)+(1|site_eng)+(1|sted)+(1|W)+(1|WC)
-  ,na.action=na.omit
-  ,REML=T
-  #,control=lmerControl(optimizer="bobyqa")
-  ,data=c_mess_master)
-
-#summary(VCA_gral)
-
-library(nlme)
-
-vca <- as.data.frame(VarCorr(VCA))
-
-vca |> group_by(grp) |> summarise(
-  varprop = vcov / sum(vca$vcov) * 100) |> arrange(
-    varprop, grp) 
-
-
-
-table(c_mess_site_problem$sted)
-
-
 
