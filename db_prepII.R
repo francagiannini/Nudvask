@@ -130,8 +130,8 @@ wea_c |>
 
 hist(wea_c$drain_day)
 
-table(wea_c$meas_day)
-summary(wea_c$meas_day_inter)
+table(wea_c$drain_day)
+summary(wea_c$drain_day)
 head(wea_c)
 
 
@@ -171,9 +171,30 @@ head(wea_c)
 
 c_mess <- read.table("data_preproc/my_mess_nless.txt",sep="\t",header = TRUE)
 
-##summary(c_mess$check_drain)
+c_mess <- c_mess |> 
+  mutate(leach_year = ifelse(month<8,
+                             paste(year-1),
+                             paste(year)
+  )) |> 
+  group_by(sted,leach_year) |> 
+  arrange(date) |> 
+  mutate(afstro_sum=cumsum(afstroemning))
 
-# c_problem <- c_mess |> filter(is.na(sted)) 
+#table(c_mess$measure_grp)
+
+c_mess |> filter(measure_grp==TRUE) |> 
+  ggplot(aes(x = afstro_sum, y =newconc )) +
+  geom_point() +
+  geom_smooth(method = "loess", se = F) +
+  theme(panel.grid = element_blank()) +
+  geom_vline(aes(xintercept = 90,
+                size = 2, colour = "red", alpha=0.6))+
+  #facet_wrap(~year, nrow=4,scales = "free_x")+
+  labs(y="Concenration", x="Cummulitive drain")+
+  theme_bw()
+
+
+#c_problem <- c_mess |> filter(is.na(sted)) 
 
 # table_check <- as.data.frame(table(c_problem$sted.x,c_problem$year.x)) |> 
 #   filter(Freq>0)
@@ -209,14 +230,18 @@ sites |>  select(!c(strno,StedNavn)) |> unique() |>
 c_mess_site <- merge(c_mess,
                      sites,
                      by.x = 'sted',
-                     by.y = 'strno'#,
-                     #all.x = TRUE
+                     by.y = 'strno',
+                     all.x = TRUE
                      ) |> 
   mutate(harvest_year = ifelse(month < 4, year - 1, year)) |>
   mutate(merge_id = fct_cross(as.character(sted),
-                              as.character(harvest_year),
+                              as.character(harvest_year),#as.character(year)
          sep = "_"))
 
+
+c_mess_site_problems <- c_mess_site |> filter(is.na(site_eng))
+
+summary(c_mess_site_problems)
 
 ### concentration, percolations, site, nless data ----
 
@@ -224,20 +249,14 @@ master <- read_excel("data_raw/masterNLESS_Franka100822.xls"
                      , sheet = "master_engl2"
                      #,.name_repair = "minimal"
 ) |>  mutate(merge_id=fct_cross(as.character(Id),
-                                as.character(harvest_year),
+                                as.character(harvest_year),#year
              sep="_")) |> select(!year)
 
 
-## period
-
-#start <- make_datetime(month = 4, day=1, year = year)
-
-#end <- make_datetime(month = 3, day=31, year = year+1)
-
 c_mess_master <- merge(c_mess_site,
                      master,
-                     by='merge_id'#,
-                     #all.x = TRUE
+                     by='merge_id',
+                     all.x = TRUE
                      ) |> 
   # mutate(
   #   start_date=ymd(ifelse(month<4, 
@@ -247,13 +266,18 @@ c_mess_master <- merge(c_mess_site,
   #   ) 
 # |>  
   mutate(
-    day_harv=as.numeric(as.Date(date)-as.Date(paste(harvest_year.y, "04", "01",sep="-"))),
+    day_harv=as.numeric(as.Date(date)-as.Date(paste(harvest_year.x, "04", "01",sep="-"))),
     day_leach=as.numeric(as.Date(date)-as.Date(ifelse(month<8,
                                                       paste(year-1, "08", "01",sep="-"),
                                                       paste(year, "08", "01",sep="-")
                                                       ))))
 
-#write.table(c_mess_master,"c_mess_master.txt", sep="\t")
 
-#*** Start II ***  -----
+c_mess_master_problems <- c_mess_master |>  filter(is.na(harvest_year.y)) |> filter(measure_grp==T)
 
+writexl::write_xlsx(c_mess_master_problems, "c_mess_master_problems.xlsx")
+
+c_mess_measure_complete <- c_mess_master |>  filter(!is.na(harvest_year.y)) |> filter(measure_grp==T)
+
+
+write.table(c_mess_master,"c_mess_master.txt", sep="\t")
