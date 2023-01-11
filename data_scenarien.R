@@ -37,13 +37,55 @@ conc_suplII <-
 
 conc_nov <- bind_rows(renset,Nkncval,valNkonc,conc_suplI,conc_suplII) |> 
   unique() |> 
-  filter(meankonc<150)
+  filter(meankonc<200)
 
 conc_nov |> ggplot(aes(y=ident,x=year))+geom_point()
 
 summary(conc_nov)
 plot(conc_nov$meankonc)
 abline(100,0, col=2)
+
+
+### answer to Christen
+
+# <1003  data obtained before 1990
+conc_nov |> dplyr::filter(ident<1003) |> 
+  group_by(ident) |> summarise(n=n(), minyear=min(year), maxyear=max(year))
+
+yless1003 <- conc_nov |> dplyr::filter(ident<1003) |>  
+  group_by(year,ident) |> summarise(n=n())
+# we dismiss from 983 to 1001
+# The other stays because they are LOOPs and 1002 has acceptable data 
+
+# 2430-2436  Do not exist 
+nana2430_2436 <- conc_nov |> dplyr::filter(between(ident,2430,2436)) #|> group_by(ident,year) |> summarise(n=n())
+# They do exist they stay they are data from 2010 and 2011
+
+# 2438-2499  Before 1990
+nana2438_2499 <- conc_nov |> dplyr::filter(between(ident,2438,2499)) |> 
+  group_by(ident,year) |> summarize(n())
+#|> group_by(ident) |> summarise(n=n(), minyear=min(year), maxyear=max(year))
+# They are not before 1990 we only dismiss ids from 2463to2499 the other stays
+
+# 2666-2683  Before 1990  (1988) # dismiss
+conc_nov |> dplyr::filter(between(ident,2666,2683)) 
+#|> group_by(ident) |> summarise(n=n(), minyear=min(year), maxyear=max(year))
+
+# 2766-2799  In 1990  - to low number of observations (only four times) # dismiss
+na2766_2799 <- conc_nov |> dplyr::filter(between(ident,2766,2799))
+
+# 2849-2900  Data from 1989  and only four observations # dismiss
+na2849_2900 <- conc_nov |> dplyr::filter(between(ident,2849,2900))
+
+# Missing and good data 2 sted 2916 2917
+conc_nov |> dplyr::filter(between(ident,2916,2917)) |> 
+  group_by(ident) |> 
+  summarise(n=n(), minyear=min(year), maxyear=max(year))
+
+# 2932-2939  These data are from Foulum – but not included due to crops not included ïn the calibration of the NLES5 # ok dismiss
+conc_nov |> dplyr::filter(between(ident,2932,2939)) |> 
+  group_by(ident) |> 
+  summarise(n=n(), minyear=min(year), maxyear=max(year))
 
 # Sites -----
 
@@ -76,8 +118,9 @@ conc_nov_site <- merge(conc_nov,
                                                      year = year)) |> 
   mutate(obs_id = paste(as.factor(ident), date, sep = "_"))
 
-
-conc_nov_site |> filter(is.na(site_eng)) |> 
+missing_sites <- 
+conc_nov_site |> 
+  filter(is.na(site_eng)) |> 
   select(ident) |> 
   unique() |> 
   summarize(n=n())
@@ -104,8 +147,12 @@ wea <- read.table("data_raw/wea_txt.txt", sep = "\t", header = T) |>
     )) |>
     group_by(sted,leach_year) |>
     arrange(date) |>
-    mutate(afstro_sum=cumsum(afstroemning))
+    mutate(afstro_sum=cumsum(afstroemning),
+           e_sum=cumsum(ea))
 
+wea[,c("afstro_sum","e_sum")] |> cor()
+
+plot(wea[,c("afstro_sum","e_sum")])
 
 #hist(wea$afstroemning)
 
@@ -168,7 +215,7 @@ day_leach = as.numeric(as.Date(date) - as.Date(ifelse(
 ))))
 
 
-c_mess_nov |> write.table("data_preproc/c_mess_nov.txt" ,sep="\t")
+#c_mess_nov |> write.table("data_preproc/c_mess_nov.txt" ,sep="\t")
 
 
 # Explore ----
@@ -194,13 +241,14 @@ c_mess_nov|>
 
 # Master data ----
 
-master <- read_excel("data_raw/Scenarier20190909B4_231120_sendt_GBM_anonym_sendtdata_med_id_vers_medNkonc Franca_updated_cdb211122.xls"
+master <- read_excel("data_raw/masterNLESS_Franka100822.xls"
   #"data_raw/masterNLESS_Franka100822.xls"
-  , sheet = "data_det_eng_2"#"master_engl2"
+  , sheet = #"data_det_eng_2"#
+  "master_engl2"
                      #,.name_repair = "minimal"
 ) |>  mutate(merge_id=fct_cross(as.character(Id),
                                 as.character(harvest_year),#year
-                                sep="_")) |> select(!year)
+                                sep="_")) #|> select(!year)
 
 
 c_mess_master <- merge(c_mess_nov,
@@ -224,11 +272,12 @@ c_mess_master <- merge(c_mess_nov,
 
 
 c_mess_master_problems <- c_mess_master |>  
-  filter(is.na(harvest_year.y)) #|> 
-  #select(merge_id) |> 
+  filter(is.na(harvest_year.y)) |> 
+  select(merge_id) #|> 
   #unique()
 
-writexl::write_xlsx(c_mess_master_problems, "c_mess_master_problems.xlsx")
+writexl::write_xlsx(c_mess_master_problems, 
+                    "c_mess_master_problems.xlsx")
 
 c_mess_measure_complete <- c_mess_master |>  filter(!is.na(harvest_year.y)) |> filter(measure_grp==T)
 
