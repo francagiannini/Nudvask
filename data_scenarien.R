@@ -43,51 +43,65 @@ conc_nov |> ggplot(aes(y=ident,x=year))+geom_point()
 
 summary(conc_nov)
 plot(conc_nov$meankonc)
-abline(100,0, col=2)
+hist(conc_nov$meankonc)
 
+(sum(conc_nov$meankonc==0)/nrow(conc_nov))*100
+
+abline(100,0, col=2)
 
 ### answer to Christen
 
-# <1003  data obtained before 1990
+# CDB <1003  data obtained before 1990
 conc_nov |> dplyr::filter(ident<1003) |> 
   group_by(ident) |> summarise(n=n(), minyear=min(year), maxyear=max(year))
 
 yless1003 <- conc_nov |> dplyr::filter(ident<1003) |>  
   group_by(year,ident) |> summarise(n=n())
 # we dismiss from 983 to 1001
+conc_nov_dep <- conc_nov |> filter(!between(ident,983,1001))
 # The other stays because they are LOOPs and 1002 has acceptable data 
 
 # 2430-2436  Do not exist 
 nana2430_2436 <- conc_nov |> dplyr::filter(between(ident,2430,2436)) #|> group_by(ident,year) |> summarise(n=n())
-# They do exist they stay they are data from 2010 and 2011
+# CDB They do exist they stay they are data from 2010 and 2011
 
-# 2438-2499  Before 1990
+# CDB 2438-2499  Before 1990
 nana2438_2499 <- conc_nov |> dplyr::filter(between(ident,2438,2499)) |> 
   group_by(ident,year) |> summarize(n())
 #|> group_by(ident) |> summarise(n=n(), minyear=min(year), maxyear=max(year))
 # They are not before 1990 we only dismiss ids from 2463to2499 the other stays
+conc_nov_dep <- conc_nov_dep |> filter(!between(ident,2463,2499))
 
-# 2666-2683  Before 1990  (1988) # dismiss
+# CDB 2666-2683  Before 1990  (1988) 
 conc_nov |> dplyr::filter(between(ident,2666,2683)) 
 #|> group_by(ident) |> summarise(n=n(), minyear=min(year), maxyear=max(year))
+# we do dismiss them 
+conc_nov_dep <- conc_nov_dep |> filter(!between(ident,2666,2683))
 
-# 2766-2799  In 1990  - to low number of observations (only four times) # dismiss
+# 2766-2799  In 1990  - to low number of observations (only four times) 
 na2766_2799 <- conc_nov |> dplyr::filter(between(ident,2766,2799))
+# we do dismiss them 
+conc_nov_dep <- conc_nov_dep |> filter(!between(ident,2766,2799))
 
 # 2849-2900  Data from 1989  and only four observations # dismiss
 na2849_2900 <- conc_nov |> dplyr::filter(between(ident,2849,2900))
+# we do dismiss them 
+conc_nov_dep <- conc_nov_dep |> filter(!between(ident,2849,2900))
 
-# Missing and good data 2 sted 2916 2917
+# CDB Missing and good data 2 sted 2916 2917
 conc_nov |> dplyr::filter(between(ident,2916,2917)) |> 
   group_by(ident) |> 
   summarise(n=n(), minyear=min(year), maxyear=max(year))
+# They stay en of the discussion 
 
-# 2932-2939  These data are from Foulum – but not included due to crops not included ïn the calibration of the NLES5 # ok dismiss
+# CDB 2932-2939  These data are from Foulum – but not included due to crops not included ïn the calibration of the NLES5
 conc_nov |> dplyr::filter(between(ident,2932,2939)) |> 
   group_by(ident) |> 
   summarise(n=n(), minyear=min(year), maxyear=max(year))
+# We actually do not have it but anyway is not a good reason to dismiss them 
 
 # Sites -----
+# Data set build from information of the NLESS5 ppr, the report an going back to the source
 
 sites <- read.table(
   "data_preproc/sites_navn.txt",
@@ -102,13 +116,16 @@ sites <- read.table(
            #st_crs(all_sites_pont)
   ) |> select(!c(StedNavn,sites_dk))
 
+
+table(sites$site_eng)
+
 tmap_mode("view")
 
 tm_shape(sites)+
   tm_dots()
 
 
-conc_nov_site <- merge(conc_nov,
+conc_nov_site <- merge(conc_nov_dep,
                        sites,
                        by.x = 'ident',
                        by.y = 'strno',
@@ -124,14 +141,29 @@ conc_nov_site <- merge(conc_nov,
   mutate(obs_id = paste(as.factor(ident), date, sep = "_"))
 
 
+write.csv(table(conc_nov_site$site_eng,conc_nov_site$year),"contingency_yearvsstation.csv")
 
+library(RColorBrewer)
+
+table(conc_nov_site$site_eng,conc_nov_site$harvest_year) |> 
+  as.data.frame() |>
+  mutate_all(~na_if(., 0)) |> 
+  ggplot( aes(x = Var2, y = Var1, fill = Freq)) +
+  geom_tile(color = "gray") +
+  scale_fill_gradientn(name = "n",
+                       na.value = 'gray',
+                       colors = brewer.pal(20,"Purples")) +
+  geom_text(aes(label = Freq), color = "black", size = 2) +
+  scale_x_discrete(name = "harvest year") +
+  scale_y_discrete(name = "Site")+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
 
 
 missing_sites <- 
 conc_nov_site |> 
   filter(is.na(site_eng)) |> 
-  select(ident) |> 
-  unique() #|> 
+  select(ident) |>
+  unique() #|>
   #summarize(n=n())
 
 # Drain ----
