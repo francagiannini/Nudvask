@@ -102,6 +102,11 @@ sites <- read.table(
            #st_crs(all_sites_pont)
   ) |> select(!c(StedNavn,sites_dk))
 
+tmap_mode("view")
+
+tm_shape(sites)+
+  tm_dots()
+
 
 conc_nov_site <- merge(conc_nov,
                        sites,
@@ -118,12 +123,16 @@ conc_nov_site <- merge(conc_nov,
                                                      year = year)) |> 
   mutate(obs_id = paste(as.factor(ident), date, sep = "_"))
 
+
+
+
+
 missing_sites <- 
 conc_nov_site |> 
   filter(is.na(site_eng)) |> 
   select(ident) |> 
-  unique() |> 
-  summarize(n=n())
+  unique() #|> 
+  #summarize(n=n())
 
 # Drain ----
 
@@ -239,6 +248,10 @@ c_mess_nov|>
   facet_wrap(~site_eng, nrow=4,scales = "free")+
   theme_bw()
 
+
+
+
+
 # Master data ----
 
 master <- read_excel("data_raw/masterNLESS_Franka100822.xls"
@@ -255,7 +268,7 @@ c_mess_master <- merge(c_mess_nov,
                        master,
                        by='merge_id',
                        all.x = TRUE
-) |> 
+) #|> 
   # mutate(
   #   start_date=ymd(ifelse(month<4, 
   #                     paste(year-1, "04", "01",sep="-"), 
@@ -263,12 +276,12 @@ c_mess_master <- merge(c_mess_nov,
   #   #end=ifelse(month<4, make_date(month = 3, day=31, year = year), make_date(month = 3, day=31, year = year+1))
   #   ) 
   # |>  
-  mutate(
-    day_harv=as.numeric(as.Date(date)-as.Date(paste(harvest_year.x, "04", "01",sep="-"))),
-    day_leach=as.numeric(as.Date(date)-as.Date(ifelse(month<8,
-                                                      paste(year-1, "08", "01",sep="-"),
-                                                      paste(year, "08", "01",sep="-")
-    ))))
+  # mutate(
+  #   day_harv=as.numeric(as.Date(date)-as.Date(paste(harvest_year.x, "04", "01",sep="-"))),
+  #   day_leach=as.numeric(as.Date(date)-as.Date(ifelse(month<8,
+  #                                                     paste(year-1, "08", "01",sep="-"),
+  #                                                     paste(year, "08", "01",sep="-")
+  #   ))))
 
 
 c_mess_master_problems <- c_mess_master |>  
@@ -284,4 +297,10 @@ c_mess_measure_complete <- c_mess_master |>  filter(!is.na(harvest_year.y)) |> f
 
 write.table(c_mess_master,"c_mess_master.txt", sep="\t")
 
-
+c_mess_master |> 
+  ggplot(aes(x = afstro_sum, y = meankonc)) +
+  geom_point() +
+  geom_smooth(method = "loess", se = F) +
+  theme(panel.grid = element_blank()) +
+  facet_wrap(~site_eng, nrow=4,scales = "free")+
+  theme_bw()
