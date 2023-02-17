@@ -148,9 +148,11 @@ conc_nov_site <- merge(conc_nov_dep,
 tm_shape(st_as_sf(conc_nov_site))+
   tm_dots()
 
-write.table(conc_nov_site,"data_preproc//conc_nov_site.txt", sep = "\t")
+#write.table(conc_nov_site,"data_preproc//conc_nov_site.txt", sep = "\t")
 
-write.csv(table(conc_nov_site$site_eng,conc_nov_site$year),"contingency_yearvsstation.csv")
+#conc_nov_site <- read.table("data_preproc//conc_nov_site.txt", sep = "\t")
+
+#write.csv(table(conc_nov_site$site_eng,conc_nov_site$year),"contingency_yearvsstation.csv")
 
 library(RColorBrewer)
 
@@ -192,8 +194,11 @@ wea <- read.table("data_raw/wea_txt.txt", sep = "\t", header = T) |>
     drain_day = ifelse(afstroemning > 0.3, 1, 0),
     leach_year = ifelse(month<8,
                                paste(year-1),
-                               paste(year)
-    )) |>
+                               paste(year)),
+    harvest_year = ifelse(month<4, 
+                          paste(year - 1), 
+                          paste(year))
+    ) |>
     group_by(sted,leach_year) |>
     arrange(date) |>
     mutate(afstro_sum=cumsum(afstroemning),
@@ -213,27 +218,27 @@ wea <- read.table("data_raw/wea_txt.txt", sep = "\t", header = T) |>
 #   theme_bw()
 
 # #temporal ggplot
-
-wea |>
-  #filter(Id<20) |>
-  ggplot(aes(x = month, y = afstroemning)) +
-  geom_point() +
-  geom_smooth(method = "loess", se = F) +
-  #coord_cartesian(ylim = c(0,0.9)) +
-  theme(panel.grid = element_blank()) +
-  facet_wrap(~year, nrow=4)+
-  #scale_x_continuous(breaks = seq(1,12,1))+
-  theme_bw()
+# 
+# wea |>
+#   #filter(Id<20) |>
+#   ggplot(aes(x = month, y = afstroemning)) +
+#   geom_point() +
+#   geom_smooth(method = "loess", se = F) +
+#   #coord_cartesian(ylim = c(0,0.9)) +
+#   theme(panel.grid = element_blank()) +
+#   facet_wrap(~year, nrow=4)+
+#   #scale_x_continuous(breaks = seq(1,12,1))+
+#   theme_bw()
 
 
 # Merge mess ----
-
 c_mess_nov <- merge(
-  conc_nov_site,
   wea,
+  conc_nov_site,
   by = 'obs_id',
   .name_repair = "unique",
-  suffixes = c("", ".y")
+  suffixes = c("", ".y"), 
+  all.x = TRUE
 ) |> select(
   "obs_id",
   "sted",
@@ -252,20 +257,21 @@ c_mess_nov <- merge(
   "drain_day",
   "leach_year",
   "afstro_sum"
-) |> mutate(day_harv = as.numeric(as.Date(date) - as.Date(
-  paste(harvest_year, "04", "01", sep = "-")
-)),
-day_leach = as.numeric(as.Date(date) - as.Date(ifelse(
-  month < 8,
-  paste(year - 1, "08", "01", sep =
-          "-"),
-  paste(year, "08", "01", sep =
-          "-")
-))))
+) 
 
+c_mess_nov <- c_mess_nov |> 
+  mutate(
+    day_harv = as.numeric(as.Date(date) - 
+               as.Date(paste(harvest_year, "04", "01", sep = "-"))),
+    day_leach = as.numeric(as.Date(date) - 
+            as.Date(ifelse( month < 8,
+  paste(year - 1, "08", "01", sep ="-"),
+  paste(year, "08", "01", sep = "-")))
+    ),
+  day=day(as.Date(date))
+  )
 
-#c_mess_nov |> write.table("data_preproc/c_mess_nov.txt" ,sep="\t")
-
+c_mess_nov |> write.table("data_preproc/c_mess_nov.txt" ,sep="\t")
 
 # Explore ----
 #conc_nov_site |> 
@@ -294,21 +300,46 @@ c_mess_nov|>
 
 # Master data ----
 
-master <- read_excel("data_raw/Scenarier20190909B4_231120_sendt_GBM_anonym_sendtdata_med_id_vers_medNkonc Franca_updated_cdb211122.xls"
+master_b <- read_excel(
+    "data_raw/masterNLESS_Franka100822.xls"
+    , sheet = "master_engl"
+    #,.name_repair = "minimal"
+  )|> 
+  select(Id,harvest_year,N_leaching,
+         WC,N_fix,MP,WP,M,W,N_mineral_spring, N_mineral_autuomn,JB)
+
+master_a <- read_excel(
+  "data_raw/Scenarier20190909B4_231120_sendt_GBM_anonym_sendtdata_med_id_vers_medNkonc Franca_updated_cdb211122.xls"
   #"data_raw/masterNLESS_Franka100822.xls"
-  , sheet = #"data_det_eng_2"#
-  "master_engl2"
-                     #,.name_repair = "minimal"
-) |>  mutate(merge_id=fct_cross(as.character(Id),
+  , sheet = "data_det_eng_2"#
+  #"master_engl2"
+  #,.name_repair = "minimal"
+  ) |> 
+  select(Id,harvest_year,MP,WP,M,N_mineral_spring, N_mineral_autuomn)
+
+master <- bind_rows(master_a,master_b)|>
+  mutate(merge_id=fct_cross(as.character(Id),
                                 as.character(harvest_year),#year
-                                sep="_")) #|> select(!year)
+                                sep="_")) |> #select(!year) 
+  unique() |> select(!c(harvest_year,Id))
 
 
 c_mess_master <- merge(c_mess_nov,
                        master,
                        by='merge_id',
                        all.x = TRUE
-) #|> 
+) |> unique() 
+
+c_mess_master_complete <- c_mess_master |> filter(!is.na(M))
+
+
+
+
+summary(c_mess_master_complete)
+
+#saveRDS(c_mess_master_complete, "c_mess_master_complete.RDS") 
+
+#|> 
   # mutate(
   #   start_date=ymd(ifelse(month<4, 
   #                     paste(year-1, "04", "01",sep="-"), 
