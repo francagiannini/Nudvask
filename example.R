@@ -1,16 +1,16 @@
 library(tidyverse)
 
-fou_hy <- c_mess_master |> filter(site_eng == "\"Foulum\"" & 
-                                 !is.na(Id) & 
-                                 sted == 1033 &
-                                 harvest_year.x==2001)
+# fou_hy <- c_mess_master |> filter(site_eng == "\"Foulum\"" & 
+#                                  !is.na(Id) & 
+#                                  sted == 1033 &
+#                                  harvest_year.x==2001)
 
 #table(fou$sted, fou$harvest_year.x)
 
-fou_hy |> ggplot(aes(x=afstro_sum, y=meankonc))+
-  geom_point()+
-  geom_smooth()+
-  theme_bw()
+# fou_hy |> ggplot(aes(x=afstro_sum, y=meankonc))+
+#   geom_point()+
+#   geom_smooth()+
+#   theme_bw()
 
 fou <- c_mess_master |> filter(site_eng == "\"Foulum\"" & 
                                     !is.na(Id) & 
@@ -24,13 +24,13 @@ fou |> ggplot(aes(x=afstro_sum, y=meankonc))+
   geom_smooth()+
   theme_bw()
 
-fou |> ggplot(aes(x=afstro_sum, y=meankonc))+
+fou |> ggplot(aes(x=date, y=meankonc))+
   geom_point()+
   geom_smooth()+
   theme_bw()
 
 
-fou_ave <- fou |> group_by(date,afstro_sum,afstroemning) |> 
+fou_ave <- fou |> group_by(date,afstro_sum,afstroemning, day_leach, .drop = FALSE) |> 
   summarise(mean_conc=mean(meankonc)) |> 
   ungroup() |> mutate(id_val = row_number())
 
@@ -164,9 +164,9 @@ train$nweconc_inter <- interpol$C_i
 
 library(mgcv)
 
-#mod_lm = gam(conc ~ s(drain_sum, bs = "cr") , data = train_gamm)
+mod_lm = gam(conc ~ s(day_leach, bs = "cr") , data = train_gamm)
 
-mod_lm=lm(conc ~ drain_sum + I(drain_sum^2), data = train_gamm)
+#mod_lm=lm(conc ~ drain_sum + I(drain_sum^2), data = train_gamm)
 
 test$nweconc_smooth <- predict(mod_lm, test)#predict.gam(mod_lm, test)
 
@@ -185,7 +185,7 @@ train |>
 plot_baba <- test |> mutate(conc_obs_test=mean_conc) |> bind_rows(train)
 
 plot_baba|> 
-  ggplot(aes(x=drain_sum, y=nweconc_inter#, 
+  ggplot(aes(x=day_leach, y=nweconc_inter#, 
              #col=as.factor(ifelse(is.na(id_val),0,1))
              ))+
   geom_point()+

@@ -114,16 +114,21 @@ sites <- read.table(
   drop_na(site_eng) |> 
   st_as_sf(coords = c("X", "Y"), crs = 25832
            #st_crs(all_sites_pont)
-  ) |> select(!c(StedNavn,sites_dk))
+  ) |> select(!c(StedNavn , sites_dk))
 
+sites <- sites |> bind_cols(st_coordinates(sites))
 
 table(sites$site_eng)
 
 tmap_mode("view")
 
-tm_shape(sites)+
-  tm_dots()
+sites_clust_map <- tm_shape(sites)+
+  tm_dots()+
+  tm_text("site_eng", 
+          clustering = TRUE,   
+          remove.overlap = TRUE)
 
+#tmap_save(sites_clust_map, "data_preproc/sites_clust_map.html")
 
 conc_nov_site <- merge(conc_nov_dep,
                        sites,
@@ -140,6 +145,10 @@ conc_nov_site <- merge(conc_nov_dep,
                                                      year = year)) |> 
   mutate(obs_id = paste(as.factor(ident), date, sep = "_"))
 
+tm_shape(st_as_sf(conc_nov_site))+
+  tm_dots()
+
+write.table(conc_nov_site,"data_preproc//conc_nov_site.txt", sep = "\t")
 
 write.csv(table(conc_nov_site$site_eng,conc_nov_site$year),"contingency_yearvsstation.csv")
 
@@ -157,7 +166,6 @@ table(conc_nov_site$site_eng,conc_nov_site$harvest_year) |>
   scale_x_discrete(name = "harvest year") +
   scale_y_discrete(name = "Site")+
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
-
 
 missing_sites <- 
 conc_nov_site |> 
@@ -191,9 +199,9 @@ wea <- read.table("data_raw/wea_txt.txt", sep = "\t", header = T) |>
     mutate(afstro_sum=cumsum(afstroemning),
            e_sum=cumsum(ea))
 
-wea[,c("afstro_sum","e_sum")] |> cor()
+#wea[,c("afstro_sum","e_sum")] |> cor()
 
-plot(wea[,c("afstro_sum","e_sum")])
+#plot(wea[,c("afstro_sum","e_sum")])
 
 #hist(wea$afstroemning)
 
@@ -286,7 +294,7 @@ c_mess_nov|>
 
 # Master data ----
 
-master <- read_excel("data_raw/masterNLESS_Franka100822.xls"
+master <- read_excel("data_raw/Scenarier20190909B4_231120_sendt_GBM_anonym_sendtdata_med_id_vers_medNkonc Franca_updated_cdb211122.xls"
   #"data_raw/masterNLESS_Franka100822.xls"
   , sheet = #"data_det_eng_2"#
   "master_engl2"
@@ -324,7 +332,10 @@ c_mess_master_problems <- c_mess_master |>
 writexl::write_xlsx(c_mess_master_problems, 
                     "c_mess_master_problems.xlsx")
 
-c_mess_measure_complete <- c_mess_master |>  filter(!is.na(harvest_year.y)) |> filter(measure_grp==T)
+c_mess_measure_complete <-
+  c_mess_master |>  
+  filter(!is.na(harvest_year.y)) |> 
+  filter(measure_grp == T)
 
 
 write.table(c_mess_master,"c_mess_master.txt", sep="\t")
