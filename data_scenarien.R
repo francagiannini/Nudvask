@@ -4,8 +4,7 @@ library(readxl)
 library(utils)
 library(sf)
 library(tmap)
-library(tidyverse)
-
+library(RColorBrewer)
 
 # Measured concentration ----
 
@@ -43,11 +42,10 @@ conc_nov |> ggplot(aes(y=ident,x=year))+geom_point()
 
 summary(conc_nov)
 plot(conc_nov$meankonc)
-hist(conc_nov$meankonc)
-
-(sum(conc_nov$meankonc==0)/nrow(conc_nov))*100
-
 abline(100,0, col=2)
+
+hist(conc_nov$meankonc)
+(sum(conc_nov$meankonc==0)/nrow(conc_nov))*100
 
 ### answer to Christen
 
@@ -116,19 +114,38 @@ sites <- read.table(
            #st_crs(all_sites_pont)
   ) |> select(!c(StedNavn , sites_dk))
 
-sites <- sites |> bind_cols(st_coordinates(sites))
+
+dmi_grid <- st_read(
+  "O:\\Tech_Agro-data1\\Geodata\\Denmark_national\\Climate\\DMI_GRID\\DMI_10km.shp")
 
 table(sites$site_eng)
 
 tmap_mode("view")
 
-sites_clust_map <- tm_shape(sites)+
+sites_clust_map <- 
+  tm_shape(dmi_grid)+
+  tm_polygons(alpha = 0.5)+
+  tm_shape(sites)+
   tm_dots()+
   tm_text("site_eng", 
           clustering = TRUE,   
           remove.overlap = TRUE)
 
+# DMI gid ----
+
+sites <- st_join(sites,dmi_grid) |> 
+  bind_cols(st_coordinates(sites))
+
 #tmap_save(sites_clust_map, "data_preproc/sites_clust_map.html")
+
+# DMI data
+
+fnames <- list.files(
+  "O:\\Tech_AGRO\\Jornaer\\Franca\\N_conc\\10kmgridnew_geusprec22", 
+  full.names = T)
+
+do.call(rbind, lapply(fnames, read.table, sep=","))
+
 
 conc_nov_site <- merge(conc_nov_dep,
                        sites,
@@ -143,9 +160,12 @@ conc_nov_site <- merge(conc_nov_dep,
                                 lubridate::make_date(day = day, 
                                                      month = month, 
                                                      year = year)) |> 
-  mutate(obs_id = paste(as.factor(ident), date, sep = "_"))
+  mutate(obs_id = paste(as.factor(ident), date, sep = "_")) |> 
+  ## filter without loops and years before 1991
+  filter(harvest_year>=1991) |> 
+  filter(!between(ident,102,608))
 
-tm_shape(st_as_sf(conc_nov_site))+
+  tm_shape(st_as_sf(conc_nov_site))+
   tm_dots()
 
 #write.table(conc_nov_site,"data_preproc//conc_nov_site.txt", sep = "\t")
@@ -154,8 +174,6 @@ tm_shape(st_as_sf(conc_nov_site))+
 
 #write.csv(table(conc_nov_site$site_eng,conc_nov_site$year),"contingency_yearvsstation.csv")
 
-library(RColorBrewer)
-
 table(conc_nov_site$site_eng,conc_nov_site$harvest_year) |> 
   as.data.frame() |>
   mutate_all(~na_if(., 0)) |> 
@@ -163,11 +181,26 @@ table(conc_nov_site$site_eng,conc_nov_site$harvest_year) |>
   geom_tile(color = "gray") +
   scale_fill_gradientn(name = "n",
                        na.value = 'gray',
-                       colors = brewer.pal(20,"Purples")) +
+                       colors = brewer.pal(5,"Purples")) +
   geom_text(aes(label = Freq), color = "black", size = 2) +
   scale_x_discrete(name = "harvest year") +
   scale_y_discrete(name = "Site")+
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+explo_conc_plot <- conc_nov_site |>
+  ggplot(aes(x=date,y=meankonc))+
+  geom_point()+
+  geom_smooth(aes(group=merge_id),se=FALSE)+
+  scale_x_date(date_breaks = "1 years", 
+               date_labels = "%Y",
+               date_minor_breaks = "1 month")+
+  facet_grid(site_eng~.,scales = "free_y"#,switch = "y"
+             )+
+  theme(strip.text.y = element_text(angle=0),
+        axis.ticks.x = element_text(angle = 90))+
+  theme_bw() 
+  
+ggsave("explo_conc_plot.jpg", explo_conc_plot, height =100, width = 50 ,units = "cm")
 
 missing_sites <- 
 conc_nov_site |> 
