@@ -96,6 +96,11 @@ conc_nov |> dplyr::filter(between(ident,2916,2917)) |>
 conc_nov |> dplyr::filter(between(ident,2932,2939)) |> 
   group_by(ident) |> 
   summarise(n=n(), minyear=min(year), maxyear=max(year))
+
+writexl::write_xlsx(conc_nov,"data_preproc//conc_raw.xlsx",# sep = "\t",
+                    col_names = TRUE,
+                    format_headers = TRUE)
+
 # We actually do not have it but anyway is not a good reason to dismiss them 
 
 # Sites -----
@@ -135,6 +140,8 @@ sites_clust_map <-
 
 sites <- st_join(sites,dmi_grid) |> 
   bind_cols(st_coordinates(sites))
+
+write.table(sites, "sites.txt", sep="\t")
 
 #tmap_save(sites_clust_map, "data_preproc/sites_clust_map.html")
 
@@ -398,7 +405,9 @@ master_b <- read_excel(
     "data_raw/masterNLESS_Franka100822.xls"
     , sheet = "master_engl"
     #,.name_repair = "minimal"
- )|> 
+ ) 
+
+master_b <- merge(master_b, sites, by.x='Id', by.y='strno')#|> 
   # select(Id,harvest_year,N_leaching,
   #        WC,N_fix,MP,WP,M,W,N_mineral_spring,N_mineral_autuomn,JB)
 
@@ -411,13 +420,19 @@ master_a <- read_excel(
   ) #|> 
   #select(Id,harvest_year,MP,WP,M,N_mineral_spring, N_mineral_autuomn)
 
+master_a <- merge(master_a, sites, by.x='Id', by.y='strno')#|> 
+
+writexl::write_xlsx(master_a,"data_preproc//master_a.xlsx",# sep = "\t",
+                    col_names = TRUE,
+                    format_headers = TRUE)
+
 master_a1 <- read_excel(
   "data_raw/masterNLESS_Franka100822.xls"
   #"data_raw/masterNLESS_Franka100822.xls"
   , sheet = "Data_udleveret_MasterNLES5" #
   #"master_engl2"
   #,.name_repair = "minimal"
-) |> select(colnames(master_a))
+) #|> select(colnames(master_a))
 
 master_dif <- master_b[!(master_b$Id %in% master_a$Id),]
 
