@@ -124,14 +124,14 @@ tmap_mode("view")
 
 sites_clust_map <- 
   tm_shape(dmi_grid)+
-  tm_polygons(alpha = 0.5)+
+  tm_polygons(col='DMIGRIDNUM', alpha = 0.5)+
   tm_shape(sites)+
   tm_dots()+
   tm_text("site_eng", 
           clustering = TRUE,   
           remove.overlap = TRUE)
 
-# DMI gid ----
+# DMI grid ----
 
 sites <- st_join(sites,dmi_grid) |> 
   bind_cols(st_coordinates(sites))
@@ -140,11 +140,45 @@ sites <- st_join(sites,dmi_grid) |>
 
 # DMI data
 
-fnames <- list.files(
-  "O:\\Tech_AGRO\\Jornaer\\Franca\\N_conc\\10kmgridnew_geusprec22", 
-  full.names = T)
+fnames <- as.list(paste(
+  "O:\\Tech_AGRO\\Jornaer\\Franca\\N_conc\\10kmgridnew_geusprec22\\", 
+  unique(sites$DMIGRIDNUM[which(!is.na(sites$DMIGRIDNUM))]),
+  "8022", 
+  ".dwf", 
+  sep = ""))
 
-do.call(rbind, lapply(fnames, read.table, sep=","))
+names(fnames) <- unique(sites$DMIGRIDNUM[which(!is.na(sites$DMIGRIDNUM))])
+
+dmi_list <- lapply(fnames, read.fwf, 
+                           sep ="\t",
+                           skip = 36,
+                           widths= c(8, 6, 5, 8,8 ,10),
+                           col.names= 
+                        c("Year","Month","Day","GlobRad", "AirTemp","Precip"))
+
+dmi_table <- do.call(rbind,dmi_list)
+
+dmi_table <- dmi_table |> 
+  bind_cols("dmi"=row.names(dmi_table)) |> 
+  separate(dmi,c('DMIGRIDNUM','idx')#, sep="." 
+           ) |> 
+  mutate(date=make_date(year=Year, month=Month, day=Day),
+         merge_dmi=fct_cross(as.factor(DMIGRIDNUM), as.factor(date), sep = "_")
+         ) |> 
+  select(date, DMIGRIDNUM, GlobRad, AirTemp,Precip, merge_dmi)
+  
+# dwf_try <- read.fwf(
+#       fnames[]
+#       ,
+#       #row.names = FALSE,
+#       #header = FALSE,
+#       row.names=
+#       sep ="\t",
+#       skip = 36,
+#       widths=
+#         c(8, 6, 5, 8,8 ,10),
+#       col.names= c("Year","Month","Day","GlobRad", "AirTemp","Precip")
+#       )
 
 
 conc_nov_site <- merge(conc_nov_dep,
@@ -161,36 +195,58 @@ conc_nov_site <- merge(conc_nov_dep,
                                                      month = month, 
                                                      year = year)) |> 
   mutate(obs_id = paste(as.factor(ident), date, sep = "_")) |> 
-  ## filter without loops and years before 1991
-  filter(harvest_year>=1991) |> 
-  filter(!between(ident,102,608))
+  mutate(merge_dmi=fct_cross(as.factor(DMIGRIDNUM), as.factor(date), sep = "_"))
 
   tm_shape(st_as_sf(conc_nov_site))+
   tm_dots()
+  
+  
+  conc_nov_site_dmi <- merge(conc_nov_site,
+                             dmi_table,
+                             by='merge_dmi',
+                             all.x = TRUE) |> 
+  select(!c(date.y,DMIGRIDNUM.y))
+  
 
-#write.table(conc_nov_site,"data_preproc//conc_nov_site.txt", sep = "\t")
+write.table(conc_nov_site,"data_preproc//concentrationN_daily_raw_FGK.txt", sep = "\t")
 
-#conc_nov_site <- read.table("data_preproc//conc_nov_site.txt", sep = "\t")
+#conc_nov_site_dmi <- read.table("data_preproc//concentrationN_daily_raw.txt", sep = "\t")
 
-#write.csv(table(conc_nov_site$site_eng,conc_nov_site$year),"contingency_yearvsstation.csv")
 
-table(conc_nov_site$site_eng,conc_nov_site$harvest_year) |> 
+  
+  # filter without loops and years before 1991----
+  
+  conc_nov_site_dmi_dep <- conc_nov_site_dmi |> 
+  filter(!site_eng == '\\Skara\\') |>
+  filter(harvest_year>=1991) |>
+  filter(!between(ident,102,608))|>
+  filter(!site_eng =='\\Arslev\\') |> 
+  filter(!site_eng =='\\Agervig\\') |> 
+  filter(!c(site_eng =='\\Abenra\\' & harvest_year < 1993)) |> 
+  filter(!c(site_eng =='\\Askov\\' & harvest_year < 1995)) |> 
+  filter(!c(site_eng =='\\Silstrup\\' & harvest_year<= 1994)) |> 
+  #rename(date=date.x) |> 
+  mutate(date=make_date(year=year, month=month, day=day),
+         site_eng=as.character(site_eng))
+
+
+table(conc_nov_site_dmi_dep$site_eng,conc_nov_site_dmi_dep$harvest_year) |> 
   as.data.frame() |>
   mutate_all(~na_if(., 0)) |> 
   ggplot( aes(x = Var2, y = Var1, fill = Freq)) +
   geom_tile(color = "gray") +
   scale_fill_gradientn(name = "n",
-                       na.value = 'gray',
+                       na.value = 'black',
                        colors = brewer.pal(5,"Purples")) +
-  geom_text(aes(label = Freq), color = "black", size = 2) +
+  geom_text(aes(label = paste(Freq)), color = "black", size = 2) +
   scale_x_discrete(name = "harvest year") +
   scale_y_discrete(name = "Site")+
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
 
-explo_conc_plot <- conc_nov_site |>
+explo_conc_plot <- conc_nov_site_dmi_dep |>
   ggplot(aes(x=date,y=meankonc))+
   geom_point()+
-  geom_smooth(aes(group=merge_id),se=FALSE)+
+  #geom_smooth(se=FALSE)+
   scale_x_date(date_breaks = "1 years", 
                date_labels = "%Y",
                date_minor_breaks = "1 month")+
@@ -200,7 +256,11 @@ explo_conc_plot <- conc_nov_site |>
         axis.ticks.x = element_text(angle = 90))+
   theme_bw() 
   
-ggsave("explo_conc_plot.jpg", explo_conc_plot, height =100, width = 50 ,units = "cm")
+ggsave("explo_conc_plot.jpg", 
+       explo_conc_plot, 
+       height =100, 
+       width = 50,
+       units = "cm")
 
 missing_sites <- 
 conc_nov_site |> 
@@ -308,6 +368,7 @@ c_mess_nov |> write.table("data_preproc/c_mess_nov.txt" ,sep="\t")
 
 # Explore ----
 #conc_nov_site |> 
+
 c_mess_nov|> 
   #dplyr::filter(site_eng =="\"Flakkebjerg\"") |> 
   ggplot(aes(x = day_harv, y = meankonc)) +
@@ -337,36 +398,46 @@ master_b <- read_excel(
     "data_raw/masterNLESS_Franka100822.xls"
     , sheet = "master_engl"
     #,.name_repair = "minimal"
-  )|> 
-  select(Id,harvest_year,N_leaching,
-         WC,N_fix,MP,WP,M,W,N_mineral_spring, N_mineral_autuomn,JB)
+ )|> 
+  # select(Id,harvest_year,N_leaching,
+  #        WC,N_fix,MP,WP,M,W,N_mineral_spring,N_mineral_autuomn,JB)
 
 master_a <- read_excel(
   "data_raw/Scenarier20190909B4_231120_sendt_GBM_anonym_sendtdata_med_id_vers_medNkonc Franca_updated_cdb211122.xls"
   #"data_raw/masterNLESS_Franka100822.xls"
-  , sheet = "data_det_eng_2"#
+  , sheet = "data_detailed_eng" #
   #"master_engl2"
   #,.name_repair = "minimal"
-  ) |> 
-  select(Id,harvest_year,MP,WP,M,N_mineral_spring, N_mineral_autuomn)
+  ) #|> 
+  #select(Id,harvest_year,MP,WP,M,N_mineral_spring, N_mineral_autuomn)
 
-master <- bind_rows(master_a,master_b)|>
+master_a1 <- read_excel(
+  "data_raw/masterNLESS_Franka100822.xls"
+  #"data_raw/masterNLESS_Franka100822.xls"
+  , sheet = "Data_udleveret_MasterNLES5" #
+  #"master_engl2"
+  #,.name_repair = "minimal"
+) |> select(colnames(master_a))
+
+master_dif <- master_b[!(master_b$Id %in% master_a$Id),]
+
+table(master_dif$Id)
+
+master <- master_b |> 
+  #bind_rows(master_a,master_b)|>
   mutate(merge_id=fct_cross(as.character(Id),
                                 as.character(harvest_year),#year
                                 sep="_")) |> #select(!year) 
   unique() |> select(!c(harvest_year,Id))
 
 
-c_mess_master <- merge(c_mess_nov,
+c_mess_master <- merge(conc_nov_site_dmi_dep ,
                        master,
                        by='merge_id',
                        all.x = TRUE
 ) |> unique() 
 
 c_mess_master_complete <- c_mess_master |> filter(!is.na(M))
-
-
-
 
 summary(c_mess_master_complete)
 
@@ -393,8 +464,8 @@ c_mess_master_problems <- c_mess_master |>
   select(merge_id) #|> 
   #unique()
 
-writexl::write_xlsx(c_mess_master_problems, 
-                    "c_mess_master_problems.xlsx")
+writexl::write_xlsx(c_mess_master, 
+                    "c_mess_master.xlsx")
 
 c_mess_measure_complete <-
   c_mess_master |>  
