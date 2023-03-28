@@ -4,6 +4,7 @@ library(tidyverse)
 library(lubridate)
 library(readxl)
 library(utils)
+
 getwd()
 
 # Concentration marginals ----
@@ -233,7 +234,7 @@ wea_c <- wea |> mutate(
   # meas_day_inter= Maaltkonc/Intpol_newconc,
   # meas_day=ifelse(Maaltkonc/Intpol_newconc>0,TRUE, FALSE),
   obs_id = paste(sted,date, sep = "_"),
-  drain_day = ifelse(afstroemning >0, 1,0) 
+  drain_day = ifelse(afstroemning >0.1, 1,0) 
 )
 
 # Concentration ----
@@ -377,7 +378,9 @@ sites <- read.table(
   drop_na(site_eng) |> 
   st_as_sf(coords = c("X", "Y"), crs = 25832
                                    #st_crs(all_sites_pont)
-            )
+            ) 
+  
+sites <- sites |> bind_cols(st_coordinates(sites)) 
 
 tmap_mode("view")
 
@@ -385,6 +388,21 @@ sites |>  select(!c(strno,StedNavn)) |> unique() |>
 tm_shape() + 
   tm_dots()+
   tm_text("site_eng", size = 1)
+
+master <- read_excel("data_raw/masterNLESS_Franka100822.xls"
+                     , sheet = "master_engl2"
+                     #,.name_repair = "minimal"
+                     )
+
+master2 <- read_excel("data_raw/masterNLESS_Franka100822.xls"
+                                , sheet = "Data_2700_2950"
+                                #,.name_repair = "minimal"
+)
+
+
+site_managment <- merge(master, sites,
+                        by.x='Id',
+                        by.y='strno')
 
 c_mess_site <- merge(c_mess,
                      sites,
@@ -451,7 +469,4 @@ vca |> group_by(grp) |> summarise(
 table(c_mess_site_problem$sted)
 
 
-master <- read_excel("data_raw/masterNLESS_Franka100822.xls"
-                     , sheet = "master_engl2"
-                     #,.name_repair = "minimal"
-)
+
