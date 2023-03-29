@@ -1,7 +1,14 @@
 
 library(tidyverse)
+library(zoo)
+library(ggbreak)
+library(readxl)
+library(utils)
+library(sf)
+library(tmap)
+library(RColorBrewer)
 
-# Concentration observations 
+# Concentration observations ----
 cut_CDB_raw <- readxl::read_excel(
   "data_raw/daily_cut_CDB.xls",
   sheet="Cal_data_allobs130323") |> 
@@ -17,12 +24,20 @@ cut_CDB_raw <- readxl::read_excel(
            lubridate::make_date(day = day, 
                                 month = month, 
                                 year = year)) |> 
-  mutate(obs_id = paste(as.factor(Id), date, sep = "_"))
+  mutate(obs_id = paste(as.factor(Id), date, sep = "_"))|> 
+  filter(Nconc<200)
 
-head(cut_CDB_raw)
+
+cut_CDB_raw |> 
+  ggplot(aes(y=Id,x=year))+
+  scale_y_break(c(100, 1000)) +
+  scale_y_break(c(1200,2000))+
+  geom_point(col="darkgreen")+
+  theme_bw()
 
 
-# master with managment data cuted
+
+# Managmentmaster with  data cuted ----
 
 master_b <- readxl::read_excel(
   "data_preproc/master_b.xlsx") |> 
@@ -31,7 +46,7 @@ master_b <- readxl::read_excel(
                                sep = "_")) |> 
   select( 
     # identification
-    "Id",	"harvest_year",	
+    "Id",	"harvest_year",	"merge_id",
     # Site and spatial id 
     "site_eng","DMIGRIDNUM","X_CENTRE","Y_CENTRE","X","Y",
     
@@ -47,8 +62,7 @@ master_b <- readxl::read_excel(
     "N_org_year",	"N_org_year-1",	"N_org_year-2",	
     "N_from_grassing_animals",	"N_topsoil")
 
-# DMI 
-
+# DMI ----
 fnames <- as.list(paste(
   "O:\\Tech_AGRO\\Jornaer\\Franca\\N_conc\\10kmgridnew_geusprec22\\", 
   unique(master_b$DMIGRIDNUM[which(!is.na(master_b$DMIGRIDNUM))]),
@@ -78,7 +92,8 @@ dmi_table <- do.call(rbind,dmi_list)|>
     #nwe features/covariates
     tvspp=AirTemp/ifelse(Precip<=0,0.1,Precip))
 
-# Drain
+# Drain ----
+
 wea <- read.table("data_raw/wea_txt.txt", sep = "\t", header = T) |>
   mutate(date = lubridate::make_date(day = mday, month = month, year = year)) |>
   rename('Id' = 'eksponr') |>
@@ -108,23 +123,40 @@ wea <- read.table("data_raw/wea_txt.txt", sep = "\t", header = T) |>
   ) |>
   ungroup()
 
+# Sites ----
 
-# Environmental temporal covariates meteorological and bio meteorological and drain 
+sites<- read.table("data_preproc/sites.txt", sep = "\t",header = T)
 
-daily_covar <-
-  merge(wea, dmi_table) |>
+wea_s <- merge(wea, sites, by.x = 'Id', by.y = 'strno') |>
+  mutate(
+    merge_dmi = fct_cross(as.factor(DMIGRIDNUM), as.factor(date), sep = "_"),
+    merge_id = fct_cross(as.character(Id),
+                                    as.character(harvest_year),
+                                    sep = "_")
+    ) |> 
+  select(!c(data_use,source))
+
+
+# Environmental temporal covariates meteorological and bio meteorological and drain ----
+
+daily_co <-
+  merge(wea_s, dmi_table, by = 'merge_dmi',no.dups=FALSE)
+  
+daily_covar <- daily_co |> #top_n(10) |> 
+    select(!contains(".y")) |> 
+    rename(date=date.x,
+           DMIGRIDNUM=DMIGRIDNUM.x) |> 
   # days
   mutate(day_harv = as.numeric(as.Date(date) - 
                                  as.Date(paste(harvest_year, "04", "01", sep = "-"))),
          day_leach = as.numeric(as.Date(date) - 
-                                  as.Date(ifelse( month < 8,
+                                  as.Date(ifelse(month < 8,
                                                   paste(year - 1, "08", "01", sep ="-"),
                                                   paste(year, "08", "01", sep = "-")))
          )) |> 
   # features from previous days and lags
   group_by(Id) |>
   arrange(date) |>
-  
   mutate(
   Precip_lag1 = lag(Precip,1),
   Precip_lag2 = lag(Precip,2),
@@ -141,14 +173,14 @@ daily_covar <-
   AirTemp_lag2 = lag(AirTemp,2),
   AirTemp_lag2 = lag(AirTemp,3),
   
-  AirTemp_ave3 = rollapply(AirTemp, width = 2, FUN = mean, align = "right", fill = NA),
+  AirTemp_ave3 = rollapply(AirTemp, width = 2, FUN = mean, na.rm = TRUE, align = "right", fill = NA),
   AirTemp_sum3 = rollapply(AirTemp, width = 2, FUN = sum, align = "right",fill = NA),
   
-  AirTemp_ave7 = rollapply(AirTemp, width = 6, FUN = mean, align = "right",fill = NA),
+  AirTemp_ave7 = rollapply(AirTemp, width = 6, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
   AirTemp_sum7 = rollapply(AirTemp, width = 6, FUN = sum, align = "right",fill = NA),
   
   tvspp_3d = 
-    rollapply(AirTemp, width = 2, FUN = mean, align = "right", fill = NA)/
+    rollapply(AirTemp, width = 2, FUN = mean, na.rm = TRUE, align = "right", fill = NA)/
     ifelse(
       rollapply(Precip, width = 2, FUN = sum, align = "right",fill = NA)<=0,
       0.01,
@@ -162,7 +194,7 @@ daily_covar <-
     afstro_sumhy = cumsum(afstroemning),
     Precip_sumhy = cumsum(Precip),
     AirTemp_sumhy = cumsum(AirTemp),
-    Globrad_sumhy = sumsum(GlobRad)
+    Globrad_sumhy = cumsum(GlobRad)
   ) |>
   ungroup()
 
@@ -174,9 +206,63 @@ daily_covar <-
 #     mutate(Precip_1=lubridate::lag(Precip,1))
 
 
-# Merge 
+
+# Merge ----
+db <- 
+  merge(wea_s,cut_CDB_raw, by='obs_id', all.x = TRUE) |>  
+#|> top_n(10) |> 
+  select(!contains(".y"))  
+
+colnames(db)<-gsub(".x","",colnames(db))    
+
+db_f <- 
+  merge(db,master_b, by='merge_id')|>  #top_n(10) |> 
+  select(!contains(".y")) 
+
+colnames(db_f) <- gsub(".x","",colnames(db_f))  
+  
+db_f <-db_f |>  filter(Id %in% unique(cut_CDB_raw$Id)) |> 
+  mutate(measured=ifelse(is.na(Nconc),0,1))
+
+write.table(db_f, "data_preproc/db_Ndaily_cut_0323.txt", sep = "\t")
+
+writexl::write_xlsx(db_f,"data_preproc/db_Ndaily_cut_0323.xlsx",# sep = "\t",
+                    col_names = TRUE,
+                    format_headers = TRUE)
+
+# Explore ----
+
+table(db_f$measured)  
+
+unique(cut_CDB_raw$Id)[!(unique(cut_CDB_raw$Id) %in% unique(wea_s$Id))]
+#123 me faltan hay satan 
+
+unique(cut_CDB_raw$Id)[!(unique(cut_CDB_raw$Id) %in% unique(master_b$Id))]
+#siiiiiii gooooool vamos todaviaaaaa una que coincida LPMQLRP
+
+# Explore
+
+hist(db_f$Nconc, col="darkgreen")
+
+db_f |> ggplot(aes(x=Nconc))+
+  geom_histogram(aes(position="identity"), fill = "darkgreen",bins=80)+
+  #stat_density(geom = "line", aes(colour = "bla"))+
+  ylab("Count")+ xlab("daily N concentrations (mg/L)" )+
+  geom_rug() +
+  theme_bw()
+
+head(cut_CDB_raw)
 
 
-wea |> 
-  filter(merge_id, unique(cut_CDB_raw$merge_id)) |>  
-
+table(conc_nov_site_dmi_dep$site_eng,conc_nov_site_dmi_dep$harvest_year) |> 
+  as.data.frame() |>
+  mutate_all(~na_if(., 0)) |> 
+  ggplot( aes(x = Var2, y = Var1, fill = Freq)) +
+  geom_tile(color = "gray") +
+  scale_fill_gradientn(name = "n",
+                       na.value = 'black',
+                       colors = brewer.pal(5,"Purples")) +
+  geom_text(aes(label = paste(Freq)), color = "black", size = 2) +
+  scale_x_discrete(name = "harvest year") +
+  scale_y_discrete(name = "Site")+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
