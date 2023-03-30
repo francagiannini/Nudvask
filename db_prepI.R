@@ -464,8 +464,6 @@ vca |> group_by(grp) |> summarise(
   varprop = vcov / sum(vca$vcov) * 100) |> arrange(
     varprop, grp) 
 
-
-
 table(c_mess_site_problem$sted)
 
 

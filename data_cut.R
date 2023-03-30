@@ -93,7 +93,6 @@ dmi_table <- do.call(rbind,dmi_list)|>
     tvspp=AirTemp/ifelse(Precip<=0,0.1,Precip))
 
 # Drain ----
-
 wea <- read.table("data_raw/wea_txt.txt", sep = "\t", header = T) |>
   mutate(date = lubridate::make_date(day = mday, month = month, year = year)) |>
   rename('Id' = 'eksponr') |>
@@ -198,6 +197,8 @@ daily_covar <- daily_co |> #top_n(10) |>
   ) |>
   ungroup()
 
+remove(daily_co)
+
 # head(daily_covar)
 #   
 # daily_covar |>  filter(DMIGRIDNUM=="10233") |> 
@@ -219,14 +220,24 @@ db_f <-
   merge(db,master_b, by='merge_id')|>  #top_n(10) |> 
   select(!contains(".y")) 
 
+remove(db)
+
 colnames(db_f) <- gsub(".x","",colnames(db_f))  
   
 db_f <-db_f |>  filter(Id %in% unique(cut_CDB_raw$Id)) |> 
   mutate(measured=ifelse(is.na(Nconc),0,1))
 
-write.table(db_f, "data_preproc/db_Ndaily_cut_0323.txt", sep = "\t")
+#
 
-writexl::write_xlsx(db_f,"data_preproc/db_Ndaily_cut_0323.xlsx",# sep = "\t",
+db_c <- merge(db_f, daily_covar, by='merge_dmi', all.x = TRUE) |> #top_n(5)
+  select(!contains(".y")) |> unique()
+
+colnames(db_c) <- gsub(".x","",colnames(db_c))  
+
+
+write.table(db_c, "data_preproc/db_Ndaily_cut_0323.txt", sep = "\t")
+
+writexl::write_xlsx(db_c,"data_preproc/db_Ndaily_cut_0323.xlsx",# sep = "\t",
                     col_names = TRUE,
                     format_headers = TRUE)
 
@@ -253,8 +264,9 @@ db_f |> ggplot(aes(x=Nconc))+
 
 head(cut_CDB_raw)
 
-
-table(conc_nov_site_dmi_dep$site_eng,conc_nov_site_dmi_dep$harvest_year) |> 
+db_f_m <-  db_f |> filter(measured==1)
+  
+table(db_f_m$site_eng,db_f_m$harvest_year) |> 
   as.data.frame() |>
   mutate_all(~na_if(., 0)) |> 
   ggplot( aes(x = Var2, y = Var1, fill = Freq)) +

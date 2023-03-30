@@ -141,7 +141,7 @@ sites_clust_map <-
 sites <- st_join(sites,dmi_grid) |> 
   bind_cols(st_coordinates(sites))
 
-write.table(sites, "sites.txt", sep="\t")
+write.table(sites, "data_preproc/sites.txt", sep="\t")
 
 #tmap_save(sites_clust_map, "data_preproc/sites_clust_map.html")
 
@@ -279,30 +279,35 @@ conc_nov_site |>
 # Drain ----
 
 wea <- read.table("data_raw/wea_txt.txt", sep = "\t", header = T) |>
-  mutate(date = lubridate::make_date(day = mday, month = month, year = year)) |>
+  mutate(
+    date = lubridate::make_date(day = mday, month = month, year = year)) |>
   rename('sted' = 'eksponr') |>
-  select(!c(saedidentnr,
-            drain,
-            Intpol_newconc,
-            udvaskday,
-            sumudvask,
-            Maaltkonc,
-            sumafstroem)) |> 
+  select(!c(
+    saedidentnr,
+    drain,
+    Intpol_newconc,
+    udvaskday,
+    sumudvask,
+    Maaltkonc,
+    sumafstroem
+  )) |>
   mutate(
     obs_id = paste(sted, date, sep = "_"),
-  
+    
     drain_day = ifelse(afstroemning > 0.3, 1, 0),
-    leach_year = ifelse(month<8,
-                               paste(year-1),
-                               paste(year)),
-    harvest_year = ifelse(month<4, 
-                          paste(year - 1), 
+    leach_year = ifelse(month < 8,
+                        paste(year - 1),
+                        paste(year)),
+    harvest_year = ifelse(month < 4,
+                          paste(year - 1),
                           paste(year))
-    ) |>
-    group_by(sted,leach_year) |>
-    arrange(date) |>
-    mutate(afstro_sum=cumsum(afstroemning),
-           e_sum=cumsum(ea))
+  ) |>
+  group_by(sted, leach_year) |>
+  arrange(date) |>
+  mutate(
+    afstro_sum = cumsum(afstroemning),
+    e_sum = cumsum(ea)
+    )
 
 #wea[,c("afstro_sum","e_sum")] |> cor()
 
