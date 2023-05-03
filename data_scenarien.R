@@ -422,8 +422,43 @@ master_a <- read_excel(
   , sheet = "data_detailed_eng" #
   #"master_engl2"
   #,.name_repair = "minimal"
-  ) #|> 
-  #select(Id,harvest_year,MP,WP,M,N_mineral_spring, N_mineral_autuomn)
+  )[,1:31] |> 
+  mutate(merge_id=fct_cross(as.character(Id),
+                            as.character(harvest_year), #as.character(year)
+                            sep = "_"))
+
+# bis_raw_all Ely ----
+
+# conc_raw <- read.table(
+#   "O:/Tech_AGRO/Jornaer/Franca/N_conc/Nudvask/data_preproc/concentrationN_daily_raw_FGK.txt",
+#   sep = "\t", header = T)
+# 
+# raw_id <-
+#   conc_raw |> group_by(ident, harvest_year, merge_id) |> summarise(
+#     n = n(),
+#     mean_conc = mean(meankonc),
+#     sd_conc = sd(meankonc),
+#     IQR_conc = IQR(meankonc)
+#   )
+# 
+# raw_id_master <- merge(raw_id,master_a, by='merge_id', all.x = TRUE)
+# 
+# 
+raw_id_master_site <-
+  merge(raw_id_master,
+        sites,
+        by.x = 'ident',
+        by.y = 'strno',
+        all.x = TRUE)|> #top_n(10) |>
+  select(!contains(".y")) |> 
+  filter(!n<=1)
+
+write.table(raw_id_master_site, "data_preproc/raw_id_master_site.txt", sep = "\t")
+
+writexl::write_xlsx(raw_id_master_site,"data_preproc/raw_id_master_site.xlsx",# sep = "\t",
+                    col_names = TRUE,
+                    format_headers = TRUE)
+
 
 master_a <- merge(master_a, sites, by.x='Id', by.y='strno')#|> 
 

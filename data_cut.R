@@ -1,4 +1,7 @@
 
+
+# Tools ----
+
 library(tidyverse)
 library(zoo)
 library(ggbreak)
@@ -27,7 +30,6 @@ cut_CDB_raw <- readxl::read_excel(
   mutate(obs_id = paste(as.factor(Id), date, sep = "_"))|> 
   filter(Nconc<200)
 
-
 cut_CDB_raw |> 
   ggplot(aes(y=Id,x=year))+
   scale_y_break(c(100, 1000)) +
@@ -49,7 +51,6 @@ master_b <- readxl::read_excel(
     "Id",	"harvest_year",	"merge_id",
     # Site and spatial id 
     "site_eng","DMIGRIDNUM","X_CENTRE","Y_CENTRE","X","Y",
-    
     # crop sequence
     "WC",	"N_fix",	"MP",	"WP",	"M",	"W",	
     #soil
@@ -84,15 +85,17 @@ dmi_table <- do.call(rbind,dmi_list)|>
   bind_cols("dmi"=row.names(do.call(rbind,dmi_list))) |> 
   separate(dmi,c('DMIGRIDNUM','idx')#, sep="." 
   ) |> 
+  filter(Year>1988) |> 
   mutate(date=lubridate::make_date(year=Year, month=Month, day=Day),
          merge_dmi=fct_cross(as.factor(DMIGRIDNUM), as.factor(date), sep = "_")
   ) |> 
   select(date, DMIGRIDNUM, GlobRad, AirTemp,Precip, merge_dmi) |> 
   mutate(
     #nwe features/covariates
-    tvspp=AirTemp/ifelse(Precip<=0,0.1,Precip))
+  tvspp=AirTemp/ifelse(Precip<=0,0.1,Precip))
 
 # Drain ----
+
 wea <- read.table("data_raw/wea_txt.txt", sep = "\t", header = T) |>
   mutate(date = lubridate::make_date(day = mday, month = month, year = year)) |>
   rename('Id' = 'eksponr') |>
@@ -118,7 +121,9 @@ wea <- read.table("data_raw/wea_txt.txt", sep = "\t", header = T) |>
     afstro_sum = cumsum(afstroemning),
     afsto_lag1 = lag(afstroemning,1),
     afstro_sum3 = rollapply(afstroemning, width = 2, FUN = sum, align = "right",fill = NA),
-    afstro_sum7 = rollapply(afstroemning, width = 6, FUN = sum, align = "right",fill = NA)
+    afstro_sum7 = rollapply(afstroemning, width = 6, FUN = sum, align = "right",fill = NA),
+    afstro_sum15 = rollapply(afstroemning, width = 15, FUN = sum, align = "right",fill = NA)
+    
   ) |>
   ungroup()
 
@@ -126,20 +131,26 @@ wea <- read.table("data_raw/wea_txt.txt", sep = "\t", header = T) |>
 
 sites<- read.table("data_preproc/sites.txt", sep = "\t",header = T)
 
+
+## wea sites ----
+
 wea_s <- merge(wea, sites, by.x = 'Id', by.y = 'strno') |>
   mutate(
     merge_dmi = fct_cross(as.factor(DMIGRIDNUM), as.factor(date), sep = "_"),
     merge_id = fct_cross(as.character(Id),
-                                    as.character(harvest_year),
-                                    sep = "_")
-    ) |> 
+                         as.character(harvest_year),
+                         sep = "_")
+  ) |> 
   select(!c(data_use,source))
 
+remove(wea)
 
 # Environmental temporal covariates meteorological and bio meteorological and drain ----
 
 daily_co <-
   merge(wea_s, dmi_table, by = 'merge_dmi',no.dups=FALSE)
+
+remove(dmi_table)
   
 daily_covar <- daily_co |> #top_n(10) |> 
     select(!contains(".y")) |> 
@@ -158,19 +169,47 @@ daily_covar <- daily_co |> #top_n(10) |>
   arrange(date) |>
   mutate(
   Precip_lag1 = lag(Precip,1),
-  Precip_lag2 = lag(Precip,2),
-  Precip_lag1 = lag(Precip,3),
+  #Precip_lag2 = lag(Precip,2),
+  Precip_lag3 = lag(Precip,3),
+  Precip_lag7 = lag(Precip,7),
+  Precip_lag14 = lag(Precip,14),
+  Precip_lag30 = lag(Precip,30),
   
   Precip_sum3 = rollapply(Precip, width = 2, FUN = sum, align = "right",fill = NA),
   Precip_sum7 = rollapply(Precip, width = 6, FUN = sum, align = "right",fill = NA),
+  Precip_sum14 = rollapply(Precip, width = 13, FUN = sum, align = "right",fill = NA),
+  Precip_sum28 = rollapply(Precip, width = 27, FUN = sum, align = "right",fill = NA),
+  Precip_sum90 = rollapply(Precip, width = 89, FUN = sum, align = "right",fill = NA),
+  Precip_sum180 = rollapply(Precip, width = 179, FUN = sum, align = "right",fill = NA),
+  Precip_sum365 = rollapply(Precip, width = 364, FUN = sum, align = "right",fill = NA),
+  
+  Precip_ave3 = rollapply(Precip, width = 2, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
+  Precip_ave7 = rollapply(Precip, width = 6, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
+  Precip_ave14 = rollapply(Precip, width = 13, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
+  Precip_ave28 = rollapply(Precip, width = 27, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
   
   GlobRad_lag1 = lag(GlobRad,1),
+  GlobRad_lag3 = lag(GlobRad,3),
+  GlobRad_lag7 = lag(GlobRad,7),
+  GlobRad_lag14 = lag(GlobRad,14),
+  GlobRad_lag30 = lag(GlobRad,30),
+  
   GlobRad_sum3 = rollapply(GlobRad, width = 2, FUN = sum, align = "right",fill = NA),
   GlobRad_sum7 = rollapply(GlobRad, width = 6, FUN = sum, align = "right",fill = NA),
+  GlobRad_sum14 = rollapply(GlobRad, width = 13, FUN = sum, align = "right",fill = NA),
+  GlobRad_sum28 = rollapply(GlobRad, width = 27, FUN = sum, align = "right",fill = NA),
+  
+  GlobRad_ave3 = rollapply(GlobRad, width = 2, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
+  GlobRad_ave7 = rollapply(GlobRad, width = 6, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
+  GlobRad_ave14 = rollapply(GlobRad, width = 13, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
+  GlobRad_ave28 = rollapply(GlobRad, width = 27, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
   
   AirTemp_lag1 = lag(AirTemp,1),
-  AirTemp_lag2 = lag(AirTemp,2),
-  AirTemp_lag2 = lag(AirTemp,3),
+  #AirTemp_lag2 = lag(AirTemp,2),
+  AirTemp_lag3 = lag(AirTemp,3),
+  AirTemp_lag7 = lag(AirTemp,7),
+  AirTemp_lag14 = lag(AirTemp,14),
+  AirTemp_lag30 = lag(AirTemp,30),
   
   AirTemp_ave3 = rollapply(AirTemp, width = 2, FUN = mean, na.rm = TRUE, align = "right", fill = NA),
   AirTemp_sum3 = rollapply(AirTemp, width = 2, FUN = sum, align = "right",fill = NA),
@@ -178,12 +217,33 @@ daily_covar <- daily_co |> #top_n(10) |>
   AirTemp_ave7 = rollapply(AirTemp, width = 6, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
   AirTemp_sum7 = rollapply(AirTemp, width = 6, FUN = sum, align = "right",fill = NA),
   
+  AirTemp_ave14 = rollapply(AirTemp, width = 13, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
+  AirTemp_sum14 = rollapply(AirTemp, width = 13, FUN = sum, align = "right",fill = NA),
+  
+  AirTemp_ave28 = rollapply(AirTemp, width = 27, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
+  AirTemp_sum28 = rollapply(AirTemp, width = 27, FUN = sum, align = "right",fill = NA),
+  
   tvspp_3d = 
     rollapply(AirTemp, width = 2, FUN = mean, na.rm = TRUE, align = "right", fill = NA)/
     ifelse(
       rollapply(Precip, width = 2, FUN = sum, align = "right",fill = NA)<=0,
       0.01,
-      rollapply(Precip, width = 2, FUN = sum, align = "right",fill = NA))
+      rollapply(Precip, width = 2, FUN = sum, align = "right",fill = NA)),
+  
+  tvspp_14d = 
+    rollapply(AirTemp, width = 13, FUN = mean, na.rm = TRUE, align = "right", fill = NA)/
+    ifelse(
+      rollapply(Precip, width = 13, FUN = sum, align = "right",fill = NA)<=0,
+      0.01,
+      rollapply(Precip, width = 13, FUN = sum, align = "right",fill = NA)),
+  
+  tvspp_28d = 
+    rollapply(AirTemp, width = 27, FUN = mean, na.rm = TRUE, align = "right", fill = NA)/
+    ifelse(
+      rollapply(Precip, width = 27, FUN = sum, align = "right",fill = NA)<=0,
+      0.01,
+      rollapply(Precip, width = 27, FUN = sum, align = "right",fill = NA))
+  
   ) |> 
   ungroup() |> 
   # cumulative in harvest_year 
