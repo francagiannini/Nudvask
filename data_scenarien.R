@@ -217,29 +217,31 @@ conc_nov_site <- merge(conc_nov_dep,
 
 write.table(conc_nov_site,"data_preproc//concentrationN_daily_raw_FGK.txt", sep = "\t")
 
-#conc_nov_site_dmi <- read.table("data_preproc//concentrationN_daily_raw.txt", sep = "\t")
+conc_nov_site_dmi <- read.table("data_preproc//c_mess_nov.txt", sep = "\t")
 
+conc_nov_site_dmi <- read.table("data_preproc//conc_nov_site.txt", sep = "\t")
 
   
   # filter without loops and years before 1991----
   
-  conc_nov_site_dmi_dep <- conc_nov_site_dmi |> 
-  filter(!site_eng == '\\Skara\\') |>
-  filter(harvest_year>=1991) |>
-  filter(!between(ident,102,608))|>
-  filter(!site_eng =='\\Arslev\\') |> 
-  filter(!site_eng =='\\Agervig\\') |> 
-  filter(!c(site_eng =='\\Abenra\\' & harvest_year < 1993)) |> 
-  filter(!c(site_eng =='\\Askov\\' & harvest_year < 1995)) |> 
-  filter(!c(site_eng =='\\Silstrup\\' & harvest_year<= 1994)) |> 
-  #rename(date=date.x) |> 
-  mutate(date=make_date(year=year, month=month, day=day),
-         site_eng=as.character(site_eng))
+  conc_nov_site_dmi_dep <- conc_nov_site_dmi #|> 
+  # filter(!site_eng == '\\Skara\\') |>
+  # filter(harvest_year>=1991) |>
+  # filter(!between(ident,102,608))|>
+  # filter(!site_eng =='\\Arslev\\') |> 
+  # filter(!site_eng =='\\Agervig\\') |> 
+  # filter(!c(site_eng =='\\Abenra\\' & harvest_year < 1993)) |> 
+  # filter(!c(site_eng =='\\Askov\\' & harvest_year < 1995)) |> 
+  # filter(!c(site_eng =='\\Silstrup\\' & harvest_year<= 1994)) |> 
+  # #rename(date=date.x) |> 
+  # mutate(date=make_date(year=year, month=month, day=day),
+  #        site_eng=as.character(site_eng))
 
 
 table(conc_nov_site_dmi_dep$site_eng,conc_nov_site_dmi_dep$harvest_year) |> 
   as.data.frame() |>
-  mutate_all(~na_if(., 0)) |> 
+  mutate(Freq=ifelse(Freq==0,NA, Freq)) |> 
+  # mutate_all(~ na_if( .,0)) |> 
   ggplot( aes(x = Var2, y = Var1, fill = Freq)) +
   geom_tile(color = "gray") +
   scale_fill_gradientn(name = "n",
