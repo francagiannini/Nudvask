@@ -11,7 +11,6 @@ library(RColorBrewer)
 # Concentration observations ----
 # filtered and checked by CDB May 2023
 
-
 crop_names_codes <- readxl::read_excel("data_raw/nles5_crop__code_param.xlsx",
                                        sheet = "nwe_coding_crops") |>   
   select(numeric_codification, crop_name)
@@ -25,8 +24,8 @@ conc_raw <- readxl::read_excel("data_raw/conc_raw_combined_with soildata_120523_
 
 conc_raw <- conc_raw |>
   mutate(
-    'crop_main_name' =recode(crop_Main,!!!conc_raw_names_codes$name_crop),
-    'crop_winter_name'=recode(crop_Winter,!!!conc_raw_names_codes$name_crop))
+    'crop_main_name' =recode(crop_Main,!!!crop_names_codes$crop_name),
+    'crop_winter_name'=recode(crop_Winter,!!!crop_names_codes$crop_name))
 
 summary(conc_raw)
 
@@ -34,10 +33,42 @@ conc_raw
 
 conc_raw |> 
   ggplot(aes(y=ident,x=year))+
-  scale_y_break(c(100, 1000)) +
+  scale_y_break(c(0, 1000)) +
   scale_y_break(c(1200,2000))+
   geom_point(col="darkgreen")+
   theme_bw()
+
+
+table(conc_raw$crop_main_name,conc_raw$harvest_year) |> 
+  as.data.frame() |>
+  mutate(Freq=ifelse(Freq==0,NA, Freq)) |> 
+  # mutate_all(~ na_if( .,0)) |> 
+  ggplot( aes(x = Var2, y = Var1, fill = Freq)) +
+  geom_tile(color = "gray") +
+  scale_fill_gradientn(name = "n",
+                       na.value = 'black',
+                       colors = brewer.pal(5,"Greens")) +
+  geom_text(aes(label = paste(Freq)), color = "black", size = 2) +
+  scale_x_discrete(name = "harvest year") +
+  scale_y_discrete(name = "Crop")+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+
+table(conc_raw$crop_winter_name,conc_raw$harvest_year) |> 
+  as.data.frame() |>
+  mutate(Freq=ifelse(Freq==0,NA, Freq)) |> 
+  # mutate_all(~ na_if( .,0)) |> 
+  ggplot( aes(x = Var2, y = Var1, fill = Freq)) +
+  geom_tile(color = "gray") +
+  scale_fill_gradientn(name = "n",
+                       na.value = 'black',
+                       colors = brewer.pal(5,"Blues")) +
+  geom_text(aes(label = paste(Freq)), color = "black", size = 2) +
+  scale_x_discrete(name = "harvest year") +
+  scale_y_discrete(name = "Crop")+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+
 
 # Managmentmaster with  data cuted ----
 
@@ -120,10 +151,10 @@ wea <- read.table("data_raw/wea_txt.txt", sep = "\t", header = T) |>
   mutate(
     afstro_sum = cumsum(afstroemning),
     afsto_lag1 = lag(afstroemning,1),
-    afstro_sum3 = rollapply(afstroemning, width = 2, FUN = sum, align = "right",fill = NA),
-    afstro_sum7 = rollapply(afstroemning, width = 6, FUN = sum, align = "right",fill = NA),
-    afstro_sum15 = rollapply(afstroemning, width = 15, FUN = sum, align = "right",fill = NA)
-    
+    afstro_sum3 = rollapply(afstroemning, width = 2, FUN = sum, align = "right",fill = 0),
+    afstro_sum7 = rollapply(afstroemning, width = 6, FUN = sum, align = "right",fill = 0),
+    afstro_sum15 = rollapply(afstroemning, width = 15, FUN = sum, align = "right",fill = 0),
+    afstro_sum30 = rollapply(afstroemning, width = 30, FUN = sum, align = "right",fill = 0)
   ) |>
   ungroup()
 
@@ -170,79 +201,81 @@ daily_covar <- daily_co |> #top_n(10) |>
   mutate(
     Precip_lag1 = lag(Precip,1),
     #Precip_lag2 = lag(Precip,2),
-    Precip_lag3 = lag(Precip,3),
-    Precip_lag7 = lag(Precip,7),
+    #Precip_lag3 = lag(Precip,3),
+    #Precip_lag7 = lag(Precip,7),
     Precip_lag14 = lag(Precip,14),
     Precip_lag30 = lag(Precip,30),
+    Precip_lag60 = lag(Precip,60),
+    Precip_lag90 = lag(Precip,90),
     
-    Precip_sum3 = rollapply(Precip, width = 2, FUN = sum, align = "right",fill = NA),
-    Precip_sum7 = rollapply(Precip, width = 6, FUN = sum, align = "right",fill = NA),
-    Precip_sum14 = rollapply(Precip, width = 13, FUN = sum, align = "right",fill = NA),
-    Precip_sum28 = rollapply(Precip, width = 27, FUN = sum, align = "right",fill = NA),
-    Precip_sum90 = rollapply(Precip, width = 89, FUN = sum, align = "right",fill = NA),
-    Precip_sum180 = rollapply(Precip, width = 179, FUN = sum, align = "right",fill = NA),
-    Precip_sum365 = rollapply(Precip, width = 364, FUN = sum, align = "right",fill = NA),
+    Precip_sum3 = rollapply(Precip, width = 2, FUN = sum, align = "right",fill = 0),
+    #Precip_sum7 = rollapply(Precip, width = 6, FUN = sum, align = "right",fill = NA),
+    Precip_sum14 = rollapply(Precip, width = 13, FUN = sum, align = "right",fill = 0),
+    Precip_sum28 = rollapply(Precip, width = 27, FUN = sum, align = "right",fill = 0),
+    Precip_sum90 = rollapply(Precip, width = 89, FUN = sum, align = "right",fill = 0),
+    Precip_sum180 = rollapply(Precip, width = 179, FUN = sum, align = "right",fill = 0),
+    Precip_sum365 = rollapply(Precip, width = 364, FUN = sum, align = "right",fill = 0),
     
     Precip_ave3 = rollapply(Precip, width = 2, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
-    Precip_ave7 = rollapply(Precip, width = 6, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
+    #Precip_ave7 = rollapply(Precip, width = 6, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
     Precip_ave14 = rollapply(Precip, width = 13, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
     Precip_ave28 = rollapply(Precip, width = 27, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
     
-    GlobRad_lag1 = lag(GlobRad,1),
-    GlobRad_lag3 = lag(GlobRad,3),
-    GlobRad_lag7 = lag(GlobRad,7),
-    GlobRad_lag14 = lag(GlobRad,14),
-    GlobRad_lag30 = lag(GlobRad,30),
+    #GlobRad_lag1 = lag(GlobRad,1),
+    #GlobRad_lag3 = lag(GlobRad,3),
+    GlobRad_lag7 = lag(GlobRad,6),
+    GlobRad_lag14 = lag(GlobRad,13),
+    GlobRad_lag28 = lag(GlobRad,27),
     
-    GlobRad_sum3 = rollapply(GlobRad, width = 2, FUN = sum, align = "right",fill = NA),
-    GlobRad_sum7 = rollapply(GlobRad, width = 6, FUN = sum, align = "right",fill = NA),
-    GlobRad_sum14 = rollapply(GlobRad, width = 13, FUN = sum, align = "right",fill = NA),
-    GlobRad_sum28 = rollapply(GlobRad, width = 27, FUN = sum, align = "right",fill = NA),
+    #GlobRad_sum3 = rollapply(GlobRad, width = 2, FUN = sum, align = "right",fill = 0),
+    GlobRad_sum7 = rollapply(GlobRad, width = 6, FUN = sum, align = "right",fill = 0),
+    GlobRad_sum14 = rollapply(GlobRad, width = 13, FUN = sum, align = "right",fill = 0),
+    GlobRad_sum28 = rollapply(GlobRad, width = 27, FUN = sum, align = "right",fill = 0),
     
-    GlobRad_ave3 = rollapply(GlobRad, width = 2, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
+    #GlobRad_ave3 = rollapply(GlobRad, width = 2, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
     GlobRad_ave7 = rollapply(GlobRad, width = 6, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
     GlobRad_ave14 = rollapply(GlobRad, width = 13, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
     GlobRad_ave28 = rollapply(GlobRad, width = 27, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
     
-    AirTemp_lag1 = lag(AirTemp,1),
+    #AirTemp_lag1 = lag(AirTemp,1),
     #AirTemp_lag2 = lag(AirTemp,2),
-    AirTemp_lag3 = lag(AirTemp,3),
-    AirTemp_lag7 = lag(AirTemp,7),
+    #AirTemp_lag3 = lag(AirTemp,3),
     AirTemp_lag14 = lag(AirTemp,14),
     AirTemp_lag30 = lag(AirTemp,30),
+    AirTemp_lag7 = lag(AirTemp,60),
     
     AirTemp_ave3 = rollapply(AirTemp, width = 2, FUN = mean, na.rm = TRUE, align = "right", fill = NA),
-    AirTemp_sum3 = rollapply(AirTemp, width = 2, FUN = sum, align = "right",fill = NA),
+    AirTemp_sum3 = rollapply(AirTemp, width = 2, FUN = sum, align = "right",fill = 0),
     
     AirTemp_ave7 = rollapply(AirTemp, width = 6, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
-    AirTemp_sum7 = rollapply(AirTemp, width = 6, FUN = sum, align = "right",fill = NA),
+    AirTemp_sum7 = rollapply(AirTemp, width = 6, FUN = sum, align = "right",fill = 0),
     
     AirTemp_ave14 = rollapply(AirTemp, width = 13, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
-    AirTemp_sum14 = rollapply(AirTemp, width = 13, FUN = sum, align = "right",fill = NA),
+    AirTemp_sum14 = rollapply(AirTemp, width = 13, FUN = sum, align = "right",fill = 0),
     
     AirTemp_ave28 = rollapply(AirTemp, width = 27, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
-    AirTemp_sum28 = rollapply(AirTemp, width = 27, FUN = sum, align = "right",fill = NA),
-    
-    tvspp_3d = 
-      rollapply(AirTemp, width = 2, FUN = mean, na.rm = TRUE, align = "right", fill = NA)/
-      ifelse(
-        rollapply(Precip, width = 2, FUN = sum, align = "right",fill = NA)<=0,
-        0.01,
-        rollapply(Precip, width = 2, FUN = sum, align = "right",fill = NA)),
+    AirTemp_sum28 = rollapply(AirTemp, width = 27, FUN = sum, align = "right",fill = 0),
     
     tvspp_14d = 
       rollapply(AirTemp, width = 13, FUN = mean, na.rm = TRUE, align = "right", fill = NA)/
       ifelse(
-        rollapply(Precip, width = 13, FUN = sum, align = "right",fill = NA)<=0,
+        rollapply(Precip, width = 13, FUN = sum, align = "right",fill = 0)<=0,
         0.01,
-        rollapply(Precip, width = 13, FUN = sum, align = "right",fill = NA)),
+        rollapply(Precip, width = 13, FUN = sum, align = "right",fill = 0)),
     
     tvspp_28d = 
       rollapply(AirTemp, width = 27, FUN = mean, na.rm = TRUE, align = "right", fill = NA)/
       ifelse(
-        rollapply(Precip, width = 27, FUN = sum, align = "right",fill = NA)<=0,
+        rollapply(Precip, width = 27, FUN = sum, align = "right",fill = 0)<=0,
         0.01,
-        rollapply(Precip, width = 27, FUN = sum, align = "right",fill = NA))
+        rollapply(Precip, width = 27, FUN = sum, align = "right",fill = 0)),
+    
+    tvspp_60= 
+      rollapply(AirTemp, width = 60, FUN = mean, na.rm = TRUE, align = "right", fill = NA)/
+      ifelse(
+        rollapply(Precip, width = 60, FUN = sum, align = "right",fill = 0)<=0,
+        0.01,
+        rollapply(Precip, width = 60, FUN = sum, align = "right",fill = 0))
     
   ) |> 
   ungroup() |> 
@@ -252,12 +285,21 @@ daily_covar <- daily_co |> #top_n(10) |>
   mutate(
     afstro_sumhy = cumsum(afstroemning),
     Precip_sumhy = cumsum(Precip),
-    AirTemp_sumhy = cumsum(AirTemp),
-    Globrad_sumhy = cumsum(GlobRad)
+    AirTemp_avehy = mean(AirTemp, na.rm=TRUE),
+    Globrad_avehy = mean(GlobRad, na.rm=TRUE)
+  ) |>
+  ungroup() |> 
+group_by(Id, harvest_year,month) |>
+  arrange(date) |>
+  mutate(
+    afstro_sum_month = cumsum(afstroemning),
+    Precip_sum_month = cumsum(Precip),
+    AirTemp_ave_month = mean(AirTemp),
+    Globrad_ave_month = mean(GlobRad)
   ) |>
   ungroup()
 
-remove(daily_co)
+#remove(daily_co)
 
 # head(daily_covar)
 #   
@@ -272,7 +314,7 @@ conc_raw <- conc_raw |>
 
 # Merge ----
 db <- 
-  merge(wea_s,conc_raw, by='obs_id', all.x = TRUE) |>  
+  merge(daily_covar,conc_raw, by='obs_id', all.x = TRUE) |>  
   #|> top_n(10) |> 
   select(!contains(".y"))  
 
