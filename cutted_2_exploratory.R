@@ -299,6 +299,7 @@ group_by(Id, harvest_year,month) |>
   ) |>
   ungroup()
 
+saveRDS(daily_covar, "daily_covar.RDS")
 #remove(daily_co)
 
 # head(daily_covar)
@@ -315,10 +316,11 @@ conc_raw <- conc_raw |>
 # Merge ----
 db <- 
   merge(daily_covar,conc_raw, by='obs_id', all.x = TRUE) |>  
-  #|> top_n(10) |> 
   select(!contains(".y"))  
 
 colnames(db)<-gsub(".x","",colnames(db))    
+
+#saveRDS(db, "db.RDS")
 
 db_f <- 
   merge(db,master_b, by='merge_id')|>  #top_n(10) |> 
@@ -335,17 +337,17 @@ db_f <- db_f |> filter(measured==1)
 
 # last merge ----
 
-daily_covar <- daily_covar |> unique()
+# daily_covar <- daily_covar |> unique()
+# 
+# db_c <- merge(db_f, daily_covar, by='merge_dmi') |> #top_n(5)
+#   select(!contains(".y")) |> unique()
+# 
+# colnames(db_c) <- gsub(".x","",colnames(db_c))  
 
-db_c <- merge(db_f, daily_covar, by='merge_dmi') |> #top_n(5)
-  select(!contains(".y")) |> unique()
 
-colnames(db_c) <- gsub(".x","",colnames(db_c))  
+write.table(db_f, "data_preproc/db_Ndaily_cut_0523.txt", sep = "\t")
 
-
-write.table(db_c, "data_preproc/db_Ndaily_cut_0323.txt", sep = "\t")
-
-writexl::write_xlsx(db_c,"data_preproc/db_Ndaily_cut_0323.xlsx",# sep = "\t",
+writexl::write_xlsx(db_f,"data_preproc/db_Ndaily_cut_0523.xlsx",# sep = "\t",
                     col_names = TRUE,
                     format_headers = TRUE)
 
