@@ -27,7 +27,35 @@ conc_raw <- conc_raw |>
     'crop_main_name' =recode(crop_Main,!!!crop_names_codes$crop_name),
     'crop_winter_name'=recode(crop_Winter,!!!crop_names_codes$crop_name))
 
+# Sites ----
+
+sites<- read.table("data_preproc/sites.txt", sep = "\t",header = T)
+
+## concentration sites ----
+
+ conc_raw <- merge(conc_raw, sites, by.x = 'ident', by.y = 'strno') #|>
+#   mutate(
+#     merge_dmi = fct_cross(as.factor(DMIGRIDNUM), as.factor(date), sep = "_"),
+#     merge_id = fct_cross(as.character(ident),
+#                          as.character(harvest_year),
+#                          sep = "_")
+#   )
+
 summary(conc_raw)
+
+table(conc_raw$site_eng,conc_raw$harvest_year) |> 
+  as.data.frame() |>
+  mutate(Freq=ifelse(Freq==0,NA, Freq)) |> 
+  # mutate_all(~ na_if( .,0)) |> 
+  ggplot( aes(x = Var2, y = Var1, fill = Freq)) +
+  geom_tile(color = "gray") +
+  scale_fill_gradientn(name = "n",
+                       na.value = 'black',
+                       colors = brewer.pal(5,"Purples")) +
+  geom_text(aes(label = paste(Freq)), color = "black", size = 2) +
+  scale_x_discrete(name = "harvest year") +
+  scale_y_discrete(name = "Site")+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
 
 conc_raw
 
@@ -50,7 +78,7 @@ table(conc_raw$crop_main_name,conc_raw$harvest_year) |>
                        colors = brewer.pal(5,"Greens")) +
   geom_text(aes(label = paste(Freq)), color = "black", size = 2) +
   scale_x_discrete(name = "harvest year") +
-  scale_y_discrete(name = "Crop")+
+  scale_y_discrete(name = "Main Crop")+
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
 
 
@@ -65,9 +93,8 @@ table(conc_raw$crop_winter_name,conc_raw$harvest_year) |>
                        colors = brewer.pal(5,"Blues")) +
   geom_text(aes(label = paste(Freq)), color = "black", size = 2) +
   scale_x_discrete(name = "harvest year") +
-  scale_y_discrete(name = "Crop")+
+  scale_y_discrete(name = "Winter crop")+
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
-
 
 
 # Managmentmaster with  data cuted ----
@@ -130,37 +157,61 @@ dmi_table <- do.call(rbind,dmi_list)|>
 wea <- read.table("data_raw/wea_txt.txt", sep = "\t", header = T) |>
   mutate(date = lubridate::make_date(day = mday, month = month, year = year)) |>
   rename('Id' = 'eksponr') |>
-  select(!c(saedidentnr,
-            drain,
-            Intpol_newconc,
-            udvaskday,
-            sumudvask,
-            Maaltkonc,
-            sumafstroem)) |> 
+  select(!c(
+    saedidentnr,
+    drain,
+    Intpol_newconc,
+    udvaskday,
+    sumudvask,
+    Maaltkonc,
+    sumafstroem
+  )) |>
   mutate(
     obs_id = paste(Id, date, sep = "_"),
     drain_bi = ifelse(afstroemning > 0.3, 1, 0),
-    leach_year = ifelse(month<8,
-                        paste(year-1),
+    leach_year = ifelse(month < 8,
+                        paste(year - 1),
                         paste(year)),
-    harvest_year = ifelse(month<4, 
-                          paste(year - 1), 
-                          paste(year))) |> 
+    harvest_year = ifelse(month < 4,
+                          paste(year - 1),
+                          paste(year))
+  ) |>
   group_by(Id, harvest_year) |>
   arrange(date) |>
   mutate(
     afstro_sum = cumsum(afstroemning),
-    afsto_lag1 = lag(afstroemning,1),
-    afstro_sum3 = rollapply(afstroemning, width = 2, FUN = sum, align = "right",fill = 0),
-    afstro_sum7 = rollapply(afstroemning, width = 6, FUN = sum, align = "right",fill = 0),
-    afstro_sum15 = rollapply(afstroemning, width = 15, FUN = sum, align = "right",fill = 0),
-    afstro_sum30 = rollapply(afstroemning, width = 30, FUN = sum, align = "right",fill = 0)
+    afsto_lag1 = lag(afstroemning, 1),
+    afstro_sum3 = rollapply(
+      afstroemning,
+      width = 2,
+      FUN = sum,
+      align = "right",
+      fill = 0
+    ),
+    afstro_sum7 = rollapply(
+      afstroemning,
+      width = 6,
+      FUN = sum,
+      align = "right",
+      fill = 0
+    ),
+    afstro_sum15 = rollapply(
+      afstroemning,
+      width = 15,
+      FUN = sum,
+      align = "right",
+      fill = 0
+    ),
+    afstro_sum30 = rollapply(
+      afstroemning,
+      width = 30,
+      FUN = sum,
+      align = "right",
+      fill = 0
+    )
   ) |>
   ungroup()
 
-# Sites ----
-
-sites<- read.table("data_preproc/sites.txt", sep = "\t",header = T)
 
 
 ## wea sites ----
@@ -179,7 +230,7 @@ remove(wea)
 # Environmental temporal covariates meteorological and bio meteorological and drain ----
 
 daily_co <-
-  merge(wea_s, dmi_table, by = 'merge_dmi',no.dups=FALSE)
+  merge(dmi_table, wea_s, by = 'merge_dmi',no.dups=FALSE, all.x=TRUE)
 
 remove(dmi_table)
 
@@ -216,10 +267,11 @@ daily_covar <- daily_co |> #top_n(10) |>
     Precip_sum180 = rollapply(Precip, width = 179, FUN = sum, align = "right",fill = 0),
     Precip_sum365 = rollapply(Precip, width = 364, FUN = sum, align = "right",fill = 0),
     
-    Precip_ave3 = rollapply(Precip, width = 2, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
-    #Precip_ave7 = rollapply(Precip, width = 6, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
-    Precip_ave14 = rollapply(Precip, width = 13, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
-    Precip_ave28 = rollapply(Precip, width = 27, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
+    Precip_ave3 = rollapply(Precip, width = 2, FUN = mean, 
+                            na.rm = TRUE,align = "right", fill = NA),
+    #Precip_ave7 = rollapply(Precip, width = 6, FUN = mean, na.rm = TRUE, align = "right"),
+    Precip_ave14 = rollapply(Precip, width = 13, FUN = mean, na.rm = TRUE, align = "right", fill = NA),
+    Precip_ave28 = rollapply(Precip, width = 27, FUN = mean, na.rm = TRUE, align = "right", fill = NA),
     
     #GlobRad_lag1 = lag(GlobRad,1),
     #GlobRad_lag3 = lag(GlobRad,3),
@@ -233,9 +285,9 @@ daily_covar <- daily_co |> #top_n(10) |>
     GlobRad_sum28 = rollapply(GlobRad, width = 27, FUN = sum, align = "right",fill = 0),
     
     #GlobRad_ave3 = rollapply(GlobRad, width = 2, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
-    GlobRad_ave7 = rollapply(GlobRad, width = 6, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
-    GlobRad_ave14 = rollapply(GlobRad, width = 13, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
-    GlobRad_ave28 = rollapply(GlobRad, width = 27, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
+    GlobRad_ave7 = rollapply(GlobRad, width = 6, FUN = mean, na.rm = TRUE, align = "right", fill = NA),
+    GlobRad_ave14 = rollapply(GlobRad, width = 13, FUN = mean, na.rm = TRUE, align = "right", fill = NA),
+    GlobRad_ave28 = rollapply(GlobRad, width = 27, FUN = mean, na.rm = TRUE, align = "right", fill = NA),
     
     #AirTemp_lag1 = lag(AirTemp,1),
     #AirTemp_lag2 = lag(AirTemp,2),
@@ -244,11 +296,11 @@ daily_covar <- daily_co |> #top_n(10) |>
     AirTemp_lag30 = lag(AirTemp,30),
     AirTemp_lag7 = lag(AirTemp,60),
     
-    AirTemp_ave3 = rollapply(AirTemp, width = 2, FUN = mean, na.rm = TRUE, align = "right", fill = NA),
-    AirTemp_sum3 = rollapply(AirTemp, width = 2, FUN = sum, align = "right",fill = 0),
+    #AirTemp_ave3 = rollapply(AirTemp, width = 2, FUN = mean, na.rm = TRUE, align = "right", fill = NA),
+    #AirTemp_sum3 = rollapply(AirTemp, width = 2, FUN = sum, align = "right",fill = 0),
     
-    AirTemp_ave7 = rollapply(AirTemp, width = 6, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
-    AirTemp_sum7 = rollapply(AirTemp, width = 6, FUN = sum, align = "right",fill = 0),
+    #AirTemp_ave7 = rollapply(AirTemp, width = 6, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
+    #AirTemp_sum7 = rollapply(AirTemp, width = 6, FUN = sum, align = "right",fill = 0),
     
     AirTemp_ave14 = rollapply(AirTemp, width = 13, FUN = mean, na.rm = TRUE, align = "right",fill = NA),
     AirTemp_sum14 = rollapply(AirTemp, width = 13, FUN = sum, align = "right",fill = 0),
@@ -304,7 +356,11 @@ saveRDS(daily_covar, "daily_covar.RDS")
 
 # head(daily_covar)
 #   
-# daily_covar |>  filter(DMIGRIDNUM=="10233") |> 
+ daily_covar |>  filter(obs_id=="1029_2009-03-19")
+ daily_covar |>  filter(Id=="1029"& year==2009)
+ 10483
+ daily_covar |>  filter(DMIGRIDNUM=="10483"& year==2009)
+ #|> 
 #     group_by(Id) |> 
 #     arrange(day)
 #     mutate(Precip_1=lubridate::lag(Precip,1))
@@ -315,25 +371,24 @@ conc_raw <- conc_raw |>
 
 # Merge ----
 db <- 
-  merge(daily_covar,conc_raw, by='obs_id', all.x = TRUE) |>  
+  merge(conc_raw, daily_covar, by='obs_id', all.x = TRUE) |>  
   select(!contains(".y"))  
 
 colnames(db)<-gsub(".x","",colnames(db))    
 
 #saveRDS(db, "db.RDS")
-
-db_f <- 
-  merge(db,master_b, by='merge_id')|>  #top_n(10) |> 
-  select(!contains(".y")) 
+# 
+db_f <-
+  merge(db,master_b, by='merge_id', all.x = TRUE)|>  #top_n(10) |>
+  select(!contains(".y")) #|> 
+  #mutate(measured=ifelse(is.na(meankonc),0,1))
 
 remove(db)
 
 colnames(db_f) <- gsub(".x","",colnames(db_f))  
 
-db_f <-db_f |>  filter(Id %in% unique(conc_raw$ident)) |> 
-  mutate(measured=ifelse(is.na(meankonc),0,1))
 
-db_f <- db_f |> filter(measured==1)
+#db_f <- db_f |> filter(measured==1)
 
 # last merge ----
 
@@ -344,50 +399,8 @@ db_f <- db_f |> filter(measured==1)
 # 
 # colnames(db_c) <- gsub(".x","",colnames(db_c))  
 
-
 write.table(db_f, "data_preproc/db_Ndaily_cut_0523.txt", sep = "\t")
 
 writexl::write_xlsx(db_f,"data_preproc/db_Ndaily_cut_0523.xlsx",# sep = "\t",
                     col_names = TRUE,
                     format_headers = TRUE)
-
-# Explore ----
-
-table(db_f$measured)  
-
-unique(conc_raw$Id)[!(unique(conc_raw$Id) %in% unique(wea_s$Id))]
-#123 me faltan hay satan 
-
-unique(conc_raw$Id)[!(unique(conc_raw$Id) %in% unique(master_b$Id))]
-#siiiiiii gooooool vamos todaviaaaaa una que coincida LPMQLRP
-
-# Explore
-
-hist(db_f$meankonc, col="darkgreen")
-
-db_f |> ggplot(aes(x=meankonc))+
-  geom_histogram(aes(position="identity"), fill = "darkgreen",bins=80)+
-  #stat_density(geom = "line", aes(colour = "bla"))+
-  ylab("Count")+ xlab("daily N concentrations (mg/L)" )+
-  geom_rug() +
-  theme_bw()
-
-head(conc_raw)
-
-db_f_m <-  db_f |> 
-  filter(measured==1) |> 
-  filter(!site_eng=="\\Skara\\")
-
-table(db_f_m$site_eng,db_f_m$harvest_year) |> 
-  as.data.frame() |>
-  mutate(Freq=ifelse(Freq==0,NA, Freq)) |> 
-   # mutate_all(~ na_if( .,0)) |> 
-  ggplot( aes(x = Var2, y = Var1, fill = Freq)) +
-  geom_tile(color = "gray") +
-  scale_fill_gradientn(name = "n",
-                       na.value = 'black',
-                       colors = brewer.pal(5,"Purples")) +
-  geom_text(aes(label = paste(Freq)), color = "black", size = 2) +
-  scale_x_discrete(name = "harvest year") +
-  scale_y_discrete(name = "Site")+
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))

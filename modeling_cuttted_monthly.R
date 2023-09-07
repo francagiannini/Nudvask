@@ -19,19 +19,32 @@ library(tmap)
 
 # data ----
 
-# df_m <- read.table("data_preproc/db_Nmonthly_cut_0806.txt", sep ="\t", dec=".")
-# 
-# summary(df_m) 
-# 
-# imputation_list <- mice(df_m,                      
-#                         method = "rf",
-#                         m=5)  # "pmm" == predictive mean matching (numeric data)
-# 
-# #plot(df_m$Clay)
-# 
-# df_m_imp <- complete(imputation_list) |> 
-#   mutate(clay_cat=cut(Clay,c(-Inf,6,10, Inf), 
-#                       labels=c("low","middle","high")))
+df_m <- read.table("data_preproc/db_Nmonthly_cut_3107.txt",
+                   sep ="\t", dec=".")|>
+  mutate(prev_Main_nles5=as.factor(prev_Main_nles5),
+         prev_Winter_nles5=as.factor(prev_Winter_nles5) ,
+         Main_nles5=as.factor(Main_nles5) ,
+         Winter_nles5=as.factor(Winter_nles5),
+         jbnr=as.factor(jbnr),
+         Gamma=as.factor(Gamma),
+         WC=as.factor(WC)
+  )
+
+summary(df_m)
+md.pattern(df_m)
+
+imputation_list <- mice(df_m,
+                        method = "rf",
+                        m=5)  # "pmm" == predictive mean matching (numeric data)
+
+
+#plot(df_m$Clay)
+
+df_m_imp <- complete(imputation_list) |>
+  mutate(clay_cat=cut(clay,c(-Inf,6,10, Inf),
+                      labels=c("low","middle","high")))
+
+saveRDS(df_m_imp, "df_m_imp.RDS")
 
 df_m_imp <- readRDS("df_m_imp.RDS")
   
@@ -96,7 +109,7 @@ table(df_m_imp$site_eng,df_m_imp$harvest_year) |>
                        colors = brewer.pal(5,"Purples")) +
   geom_text(aes(label = paste(Freq)), color = "black", size = 2) +
   scale_x_discrete(name = "harvest year") +
-  scale_y_discrete(name = "Crop")+
+  scale_y_discrete(name = "Site")+
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
 
 table(df_m_imp$crop_main_name,df_m_imp$harvest_year) |> 
@@ -137,7 +150,7 @@ df_m_imp |>
   )
   )+
   geom_boxplot() +
-  facet_wrap(~Main_crop_nles5, nrow = 4, scales = "free_y")+
+  facet_wrap(~Main_nles5, nrow = 4, scales = "free_y")+
   #scale_x_continuous(breaks = seq(1,12,1))+
   #geom_smooth()
   theme_bw()
@@ -148,83 +161,89 @@ fil_df_m_imp <- df_m_imp |> dplyr::filter(ident==2702)
 
 # feature selection ----
 
-df_gen <-   df_m_imp |>  
+df_gen <-df_m_imp |>
   select(
-    #merge_mon,
-    #merge_id,
-    #ident,
-    harvest_year,
-    #year ,
-    month ,
-    #Clay ,
-    Or_n_tonN_ha,
-    #crop_Main ,
-    #crop_Winter ,
-    Detailed_data_coubling_jb,
-    #Gamma,
-    Mfu,
-    Vfu ,
-    Main_crop_nles5 ,
-    Vinter_crop_nles5,
-    #crop_main_name,
-    #crop_winter_name ,
-    meancon,
-    #mediancon ,
-    #sdcon   ,
-    #n ,
-    #site_eng,
-    #data_use
-    #source ,
-    #p_no    ,
-    #DMIGRIDNUM ,
-    #X_CENTRE,
-    #Y_CENTRE,
-    X,
-    Y,
-    #geometry   ,
-    N_mineral_spring,
-    #N_mineral_autuomn,
-    N_min_year.1,
-    N_min_year.2,
-    N_f_year,
-    N_f_year.1,
-    N_f_year.2,
-    N_org_year,
-    N_org_year.1,
-    N_org_year.2,
-    #N_from_grassing_animals  ,
-    N_topsoil,
-    #Id,
-    #afstro_sum_month,
-    Precip_sum_month,
-    AirTemp_ave_month,
-    Globrad_ave_month,
-    tvspp_month,
-    drain_days,
-    Precip_sum60,
-    Precip_sum90,
-    Precip_sum180,
-    Precip_sum365,
-    AirTemp_ave60 ,
-    AirTemp_ave90,
-    AirTemp_ave180,
-    tvspp_60,
-    tvspp_90,
-    #afstro_sumhy,
-    Precip_sumhy,
-    AirTemp_avehy,
-    Globrad_avehy,
-    clay_cat
-  ) |> 
-  mutate(Mfu=as.factor(Mfu),
-             Vfu=as.factor(Vfu) ,
-             Main_crop_nles5=as.factor(Main_crop_nles5) ,
-             Vinter_crop_nles5=as.factor(Vinter_crop_nles5),
-         Detailed_data_coubling_jb=as.factor(Detailed_data_coubling_jb)
-  ) |> 
+    #"merge_mon",
+    #"dent",
+    #"merge_id",
+    "harvest_year",
+    #"year",
+    "month",
+    "WC",
+    "N_mineral_spring",
+    #"N_mineral_autuomn",
+    "N_min_year.1",
+    "N_min_year.2",
+    "N_f_year",
+    "N_f_year.1",
+    "N_f_year.2",
+    "N_org_year",
+    "N_org_year.1",
+    "N_org_year.2",
+    "N_from_grassing_animals",
+    "N_topsoil",
+    "clay",
+    "Gamma",
+    "jbnr",
+    "prev_Main_nles5",
+    "prev_Winter_nles5",
+    "Main_nles5",
+    "Winter_nles5",
+    "meancon",
+    #"mediancon",
+    #"sdcon",
+    #"n",
+    #"crop_main_name",
+    #"crop_winter_name" ,
+    "site_eng",
+    #"data_use",
+    #"source",
+    #"p_no",
+    #"DMIGRIDNUM",
+    #"X_CENTRE",
+    #"Y_CENTRE",
+    "X",
+    "Y",
+    #"geometry",
+    #"Id",
+    #"afstro_sum_month" ,
+    "Precip_sum_month" ,
+    "AirTemp_ave_month"  ,
+    "Globrad_ave_month" ,
+    "tvspp_month",
+    "drain_days",
+    "Precip_sum60",
+    "Precip_sum90",
+    "Precip_sum180",
+    "Precip_sum365",
+    "AirTemp_ave60",
+    "AirTemp_ave90",
+    "AirTemp_ave180",
+    "tvspp_60",
+    "tvspp_90",
+    #"afstro_sumhy",
+    "Precip_sumhy",
+    "AirTemp_avehy",
+    "Globrad_avehy",  
+    "weigth_astro",
+    #"season", 
+    "clay_cat") |> 
   #filter(!is.na(crop_main_name))|>
-  filter(!meancon == 0) |> 
+  filter(!meancon == 0) |>
+  mutate(season=case_when(month %in% 3:5 ~ 'spring',
+                          month %in% 6:8 ~ 'summer',
+                          month %in% 9:11 ~ 'autumn',
+                          TRUE ~ 'winter')) |> 
   drop_na()
+
+crop_names_codes <- readxl::read_excel("data_raw/nles5_crop__code_param.xlsx",
+                                       sheet = "nwe_coding_crops") |>   
+  select(numeric_codification, crop_name)
+
+# df_gen <- conc_raw |>
+#   mutate(
+#     'M' =recode(crop_Main,!!!crop_names_codes$crop_name),
+#     'V'=recode(crop_Winter,!!!crop_names_codes$crop_name))
 
 # Boruta gen ----
 
@@ -236,7 +255,7 @@ bor_gen <-
     data = df_gen,
     doTrace = 2,
     xlab = "",
-    pValue = 0.005
+    pValue = 0.01
   )
 
 print(bor_gen)
@@ -244,12 +263,12 @@ par(mar= c(10, 4, 4, 2) + 0.5)
 plot(bor_gen,lwd = 0.1, las = 2, xlab = "")
 
 stats<-attStats(bor_gen)
-plot(TentativeRoughFix(bor_gen))
+plot(TentativeRoughFix(bor_gen),lwd = 0.1, las = 2)
 
 
 # ? 05_06 crop imbalance ? ----
 
-table(df_gen$Vinter_crop_nles5,df_gen$Main_crop_nles5) |> 
+table(df_gen$Winter_nles5,df_gen$Main_nles5) |> 
   as.data.frame() |>
   mutate(Freq=ifelse(Freq==0,NA, Freq)) |> 
   # mutate_all(~ na_if( .,0)) |> 
@@ -310,16 +329,16 @@ summary_best_subset$which[which.max(summary_best_subset$adjr2),]
 
 param_gbm <-  expand.grid(
   interaction.depth = 15,#seq(10,20,10),#c(10,12,14),
-  n.trees = seq(20000,150000,50000),
+  n.trees = seq(5000,15000,5000),
   shrinkage = 0.01,#c(0.01,0.001),
-  n.minobsinnode = seq(10,240,40)
+  n.minobsinnode = seq(5,50,5)
 )
 
 #detectCores()
 #Timedf = data.frame(time="")
 #stime = data.frame(stime)
 
-Mycluster = makeCluster(detectCores()-4)
+Mycluster = makeCluster(detectCores()-2)
 registerDoParallel(Mycluster)
 
 control <- trainControl(method = "cv",#"repeatedcv",
@@ -328,19 +347,20 @@ control <- trainControl(method = "cv",#"repeatedcv",
                         allowParallel = TRUE
 )
 
-#remotes::install_github("gbm-developers/gbm")
+remotes::install_github("gbm-developers/gbm")
 
-#gbm()
+# gbm()
 
 fitt_gbm <- caret::train(
-  log(meancon) ~.,
+  log(meancon) ~ .,
   data =df_gen,
   method = "gbm",
-  trControl = #trainControl(method="cv", number=10, allowParallel = T),
-  control,
+  preProc = c("center", "scale"),
+  #trControl = #trainControl(method="cv", number=10, allowParallel = T),
+  #control,
   verbose = FALSE,
-  metric = "RMSE",
-  tuneGrid = param_gbm
+  metric = "RMSE"#,
+  #tuneGrid = param_gbm
 )
 
 plot(fitt_gbm)
@@ -412,7 +432,7 @@ varImp(fitt_xgb)
 plot(varImp(fitt_xgb))
 
 
-saveRDS("fitt_cart.RDS")
+saveRDS(fitt_xgb, "fitt_xgb.RDS")
 
 sqrt(mean((predict(fitt_xgb,df_gen)-log(df_gen$meancon))^2))/mean(log(df_gen$meancon))* 100
 
@@ -420,13 +440,63 @@ sqrt(mean((predict(fitt_xgb,df_gen)-log(df_gen$meancon))^2))/mean(log(df_gen$mea
 # random forest ----
 
 fitt_rf <- caret::train(
-  log(meancon) ~.,
-  data =df_gen,
-  #preProc = c("center", "scale"),
+  log(meancon) ~ .,
+  data = df_gen,
+  preProc = c("center", "scale"),
   method = "rf",
-  trControl = trainControl(method = "cv",number = 10, allowParallel = T),
-  verbose = FALSE
-)
+  trControl = trainControl(method = "cv",number = 5 
+                           #, allowParallel = T
+                           ),
+  verbose = FALSE)
+
+saveRDS("fitt_rf.RDS")
+
+rf_pred <- cbind(df_gen,
+                 "rf_pred"=as.data.frame(exp(fitt_rf$finalModel$predicted))[,1]#,
+                 #as.data.frame(exp(fitt_gbm$finalModel$fit))[,1]
+                 )
+
+rf_pred |> 
+  filter(Main_nles5==1 & Winter_nles5 == 4 & harvest_year== c(1998,1999,2008))|> 
+  select(month, rf_pred, meancon,jbnr,harvest_year,clay_cat) |> 
+  pivot_longer(cols=c(rf_pred,meancon), 
+               values_to = "Concentration", names_to = "Measurement") |> 
+  ggplot(aes(month,Concentration,col=Measurement))+
+  scale_color_manual(values=c("#999999", "#E69F00"))+
+  geom_smooth(alpha=0.2, aes(linetype=Measurement))+
+  geom_point()+
+  facet_grid(clay_cat~harvest_year)+
+  theme_bw()+
+  scale_y_continuous(limits = c(-5,30), breaks = seq(0,30,10))+
+  
+  scale_x_continuous(breaks = seq(1,12,1))+
+  theme(legend.position = "bottom")
+
+rf_pred |> 
+  filter(!Winter_nles5==7) |> 
+  #filter(Main_nles5==1 & Winter_nles5 == 4 & harvest_year== c(1998,1999,2008))|> 
+  #select(month, rf_pred, meancon,jbnr,harvest_year,clay_cat) |> 
+  pivot_longer(cols=c(rf_pred,meancon), 
+               values_to = "Concentration", names_to = "Measurement") |> 
+  ggplot(aes(x=month,y=Concentration,fill=Measurement, col=Measurement))+
+  geom_boxplot(alpha=.1, aes(group=interaction(Measurement,month), fill=Measurement
+                             ) )+
+  scale_color_manual(values=c("#999999", "#E69F00"))+
+  scale_fill_manual(values=c("#999999", "#E69F00"))+
+  geom_smooth(alpha=0.3, aes(linetype=Measurement))+
+  geom_point(alpha=0.2, size=0.1)+
+  facet_grid(clay_cat~Winter_nles5)+
+  theme_bw()+
+  scale_y_continuous(limits = c(-5,30), breaks = seq(0,30,10))+
+  
+  scale_x_continuous(breaks = seq(1,12,1))+
+  theme(legend.position = "bottom")
+
+
+
+rf_pred |> group_by(season) |> 
+  summarize(RMSE=sqrt(mean((rf_pred-meancon)^2))/mean(meancon))
+
 
 plot(varImp(fitt_rf), cuts=50)
 
@@ -451,7 +521,7 @@ partialPlot(rf_mod, pred.data =df_gen,
         ), 
         plot = TRUE)
 
-saveRDS("fitt_rf.RDS")
+
 
 # selected ----
 
@@ -485,8 +555,8 @@ gam_sel <-gam(log(meancon) ~ ., data = df_gen)
 
 
 
-gamm <- mgcv::gam(log(meancon) ~ 1 + clay_cat + Main_crop_nles5+
-                    Vinter_crop_nles5+
+gamm <- mgcv::gam(log(meancon) ~ 1 + clay_cat + Main_nles5+
+                    Winter_nles5+
                     s(month, bs='ps')+
                     s(Precip_sum365, bs='ps')+
                     s(tvspp_60, bs='ps')+#harvest_year
@@ -494,9 +564,9 @@ gamm <- mgcv::gam(log(meancon) ~ 1 + clay_cat + Main_crop_nles5+
                   s(N_mineral_spring, bs='ps')+
                   #day_harv2+
                   #Precip_sum365+(1|harvest_year)+
-                  Vinter_crop_nles5:clay_cat + #crop_winter_name:day_harv#+
+                  Winter_nles5:clay_cat + #crop_winter_name:day_harv#+
                   #crop_main_name:day_harv2 + crop_winter_name:day_harv2
-                  s(month, by = Vinter_crop_nles5)
+                  s(month, by = Winter_nles5)
                   #s(month, bs='ps', sp=0.6) + s(x2, bs='ps', sp=0.6) + x3, 
                   ,data = df_gen
                   #,method="REML", 
