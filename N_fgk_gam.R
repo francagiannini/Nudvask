@@ -168,6 +168,10 @@ sm |>
     fill = "clay_cat"
   )
 
+sm_summ <- sm |> group_by(clay_cat,month) |> 
+  summarise(est=unique(est),
+            se=unique(se))
+
 sm2 <- 
   smooth_estimates(no_modGS_temp, 
                    smooth = "s(month,WC)", 
@@ -234,103 +238,129 @@ draw(no_modGS_timeN, residuals = TRUE)
 # Just temporal variability plus N level
 
 
-no_modGS_fullI <- gam(meancon~ 
-                  s(N_mineral_spring, k=3, bs='tp')+
-                  s(month,clay_cat, k=5, bs="fs")+
-                  s(Main_nles5, WC , k=5, bs="re")+
-                  s(clay_cat, k=3, bs="re")+
-                  s(Main_nles5, k=12, bs="re")+
-                  s(Winter_nles5, k=12, bs="re")+  
-                  s(Precip_cumsumhy,clay_cat, k=5, bs="fs")+
-                  s(Precip_sum365, k=3, bs='tp'),
+no_modGS_fullI <- gam( meancon~ 
+                        s(month,clay_cat, k=5, bs="fs")+ 
+                        s(Main_nles5, k=12, bs="re")+
+                        s(month,Winter_nles5, k=5, bs="fs")+
+                        s(prev_Winter_nles5, k=12, bs="re")+  
+                        s(month,Winter_nles5, k=5, bs="fs")+              
+                        s(N_mineral_spring, k=3, bs='tp')+
+                         s(Precip_sum365, k=5, bs='tp')+
+                         s(Precip_cumsumhy, k=5, bs='tp')+
+                         s(Globrad_avehy, k=5, bs='tp'),
                 data=df_gen, 
                 method="REML", 
-                family="Gamma"(link="inverse"))
+                family="Gamma"(link="log"))
 
 summary(no_modGS_fullI)
 appraise(no_modGS_fullI)
 
-draw(no_modGS_fullI, residuals = TRUE, scales = "fixed")
+draw(no_modGS_fullI)#, residuals = TRUE
 coef(no_modGS_fullI)
 #plot(no_modGS_example, shade = T)
 
-no_modGS <- gam(meancon ~ #s(month, k=3, bs="tp") +
-               #s(clay_cat, k=3, bs="re")+
-               s(month,clay_cat, k=5, bs="fs")+
-               s(Main_nles5, k=12, bs="re")+
-               s(month,Winter_nles5, k=5, bs="fs")+
+
+
+smooth_estimates(no_modGS_fullI, 
+                 smooth = "s(month,Winter_nles5)", 
+                 data = df_gen) |>
+  add_confint() |> 
+  ggplot(aes(
+    x = month,
+    y = est,
+    colour = Winter_nles5,
+    group = Winter_nles5
+  )) +
+  geom_ribbon(aes(
+    ymin = lower_ci,
+    ymax = upper_ci,
+    fill = Winter_nles5,
+    colour = NULL
+  ),
+  alpha = 0.2) +
+  geom_line() +
+  labs(
+    title = "Fitted values from model",
+    y = expression(hat(y)),
+    colour = "Winter_nles5",
+    fill = "Winter_nles5"
+  )
+
+no_mod_afstro<- gam(meancon ~ 
                s(N_mineral_spring, k=3, bs='tp')+
+               s(month,clay_cat, k=5, bs="fs")+
+               s(afstro_cumsumhy,WC, k=5, bs="fs")+
+               s(Main_nles5, k=12, bs="re")+
                s(Precip_sum365, k=3, bs='tp')#+
               
                #s(N_mineral_spring, Winter_nles5, k=9, bs='fs')
                  ,
                 data=df_gen, 
                method="REML", 
-               family="gaussian"(link="log"))
+               family="Gamma"(link="log"))
 
-summary(no_modGS)
-draw(no_modGS)
-coef(no_modGS)
+summary(no_mod_afstro)
+draw(no_mod_afstro)
+coef(no_mod_afstro)
 
-no_modGS
-
-no_modGS2 <- gam(#log()
-  meancon ~ #s(month, k=3, bs="tp") +
-                  #s(clay_cat, k=3, bs="re")+
-                  s(month,clay_cat, k=5, bs="fs")+
-                  s(Main_nles5, k=12, bs="re")+
-                  s(prev_Winter_nles5, k=12, bs="re")+
-                  s(month,Winter_nles5, k=5, bs="fs")+
-                  s(N_mineral_spring, k=3, bs='tp')+
-                  s(Precip_sum365, k=5, bs='tp')+
-                  s(Globrad_avehy, k=5, bs='tp')#+
-                  #s(tvspp_90, k=5, bs='tp')#+
-                
-                #s(N_mineral_spring, Winter_nles5, k=9, bs='fs')
-                ,
+no_mod_afstro_sim <- gam(
+  meancon ~ 
+    s(afstro_cumsumhy,clay_cat, k=5, bs="fs")+
+    s(afstro_cumsumhy,Winter_nles5, k=5, bs="fs")+
+    s(N_mineral_spring, k=3, bs='tp')+
+    s(Precip_sum365, k=5, bs='tp'),
                 data=df_gen, 
                 method="REML", 
-                family=Gamma#"gaussian"
+                family="Gamma"(link="log")
                   )
 
+summary(no_mod_afstro_sim)
+draw(no_mod_afstro_sim)
+coef(no_mod_afstro_sim)
 
-summary(no_modGS2)
 
-draw(no_modGS2)
-coef(no_modGS2)
-
-no_modGS
-
-no_modte <- gam(log(meancon) ~ 
-                  t2(month, clay_cat, Winter_nles5, bs=c("tp", "re", "re"),
-                     k=c(5, 10, 6), m=2, full=TRUE) +
-                  te(Main_nles5, k=12, bs="re")+
-                  te(N_mineral_spring, k=5, bs='tp'),
+no_modte_afstro <- gam(meancon ~ 
+           t2(afstro_cumsumhy, clay_cat, Winter_nles5, bs=c("tp", "re", "re"),
+                     k=c(5, 3, 10), m=2, full=TRUE) +
+           te(N_mineral_spring, k=5, bs='tp'),
                data=df_gen, 
                method="REML", 
-               family="gaussian")
-summary(no_modte)
-draw(no_modte)
-k.check(no_modte)
+               family="Gamma"(link="log"))
+
+summary(no_modte_afstro)
+draw(no_modte_afstro)
+k.check(no_modte_afstro)
 
 df_gen$month2 <- df_gen$month^2
-
 df_gen$month3 <- df_gen$month^3
+
+df_gen$afstro_cumsumhy2 <- df_gen$afstro_cumsumhy^2
+df_gen$afstro_cumsumhy3 <- df_gen$afstro_cumsumhy^3
 
 df_gen |> ggplot(aes(x=month, y=Precip_sum365))+ geom_point()+geom_smooth()
 
 library(lmerTest)
 
 linear_translate <- lmer(
-  log(meancon)~month+month2+month3+N_mineral_spring+Precip_sum365+
+  log(meancon)~month+month2+month3+
+    afstro_cumsumhy+afstro_cumsumhy2+afstro_cumsumhy3+
+    N_mineral_spring+Precip_sum365+
     Winter_nles5+clay_cat+
-    month:clay_cat+month2:clay_cat+month3:clay_cat+(1 | harvest_year),
+    month:clay_cat+month2:clay_cat+month3:clay_cat+(1|harvest_year),
   data = df_gen)
-
 
 summary(linear_translate)
 
-anova(linear_translate, type="F")
+df_gen$lin_pred <- predict(linear_translate, df_gen)
+
+df_gen |> filter(!Winter_nles5==7) |> 
+  ggplot(aes(y=exp(lin_pred), x=month)) + 
+  geom_boxplot(alpha=.3, aes(group=as.factor(month), 
+                             col = season)) + 
+  geom_smooth(alpha=0.3, col="gray40")+
+  facet_grid(clay_cat ~Winter_nles5
+             , scale="free") +
+  scale_x_discrete(name = NULL, breaks = NULL)
 
 # no_modG_pred <- cbind(CO2_modG_pred,
 #                     predict(CO2_modG, 
