@@ -19,7 +19,7 @@ library(tmap)
 
 # data ----
 
-df_m <- read.table("data_preproc/db_Nmonthly_cut_3107.txt",
+df_m <- read.table("data_preproc/db_Nmonthly_cut_0809.txt",
                    sep ="\t", dec=".")|>
   mutate(prev_Main_nles5=as.factor(prev_Main_nles5),
          prev_Winter_nles5=as.factor(prev_Winter_nles5) ,
@@ -161,8 +161,12 @@ fil_df_m_imp <- df_m_imp |> dplyr::filter(ident==2702)
 
 # feature selection ----
 
-df_gen <-df_m_imp |>
-  select(
+df_m_imp <- readRDS(
+  "C:/Users/au710823/OneDrive - Aarhus universitet/NLESS2022Fran/NLESSdata/Nudvask/Nudvask/df_m_imp.RDS")
+
+df_gen <-
+  df_m_imp |>
+  dplyr::select(
     #"merge_mon",
     #"dent",
     #"merge_id",
@@ -180,9 +184,9 @@ df_gen <-df_m_imp |>
     "N_org_year",
     "N_org_year.1",
     "N_org_year.2",
-    "N_from_grassing_animals",
-    "N_topsoil",
-    "clay",
+    #"N_from_grassing_animals",
+    #"N_topsoil",
+    #"clay",
     "Gamma",
     "jbnr",
     "prev_Main_nles5",
@@ -202,8 +206,8 @@ df_gen <-df_m_imp |>
     #"DMIGRIDNUM",
     #"X_CENTRE",
     #"Y_CENTRE",
-    "X",
-    "Y",
+    #"X",
+    #"Y",
     #"geometry",
     #"Id",
     #"afstro_sum_month" ,
@@ -221,13 +225,16 @@ df_gen <-df_m_imp |>
     "AirTemp_ave180",
     "tvspp_60",
     "tvspp_90",
-    #"afstro_sumhy",
+    "afstro_cumsumhy",
+    "Precip_cumsumhy",
+    "afstro_sumhy",
     "Precip_sumhy",
     "AirTemp_avehy",
-    "Globrad_avehy",  
-    "weigth_astro",
+    "Globrad_avehy",
+    #"weigth_astro",
     #"season", 
-    "clay_cat") |> 
+    "clay_cat"
+  ) |> 
   #filter(!is.na(crop_main_name))|>
   filter(!meancon == 0) |>
   mutate(season=case_when(month %in% 3:5 ~ 'spring',
@@ -236,9 +243,10 @@ df_gen <-df_m_imp |>
                           TRUE ~ 'winter')) |> 
   drop_na()
 
-crop_names_codes <- readxl::read_excel("data_raw/nles5_crop__code_param.xlsx",
-                                       sheet = "nwe_coding_crops") |>   
-  select(numeric_codification, crop_name)
+
+# crop_names_codes <- readxl::read_excel("data_raw/nles5_crop__code_param.xlsx",
+#                                        sheet = "nwe_coding_crops") |>   
+#   select(numeric_codification, crop_name)
 
 # df_gen <- conc_raw |>
 #   mutate(
@@ -449,14 +457,15 @@ fitt_rf <- caret::train(
                            ),
   verbose = FALSE)
 
-saveRDS("fitt_rf.RDS")
+saveRDS(fitt_rf,"fitt_rf.RDS")
 
-rf_pred <- cbind(df_gen,
+
+df_gen <- cbind(df_gen,
                  "rf_pred"=as.data.frame(exp(fitt_rf$finalModel$predicted))[,1]#,
                  #as.data.frame(exp(fitt_gbm$finalModel$fit))[,1]
                  )
 
-rf_pred |> 
+df_gen |> 
   filter(Main_nles5==1 & Winter_nles5 == 4 & harvest_year== c(1998,1999,2008))|> 
   select(month, rf_pred, meancon,jbnr,harvest_year,clay_cat) |> 
   pivot_longer(cols=c(rf_pred,meancon), 
@@ -472,7 +481,7 @@ rf_pred |>
   scale_x_continuous(breaks = seq(1,12,1))+
   theme(legend.position = "bottom")
 
-rf_pred |> 
+df_gen |> 
   filter(!Winter_nles5==7) |> 
   #filter(Main_nles5==1 & Winter_nles5 == 4 & harvest_year== c(1998,1999,2008))|> 
   #select(month, rf_pred, meancon,jbnr,harvest_year,clay_cat) |> 
@@ -494,7 +503,7 @@ rf_pred |>
 
 
 
-rf_pred |> group_by(season) |> 
+df_gen |> group_by(season) |> 
   summarize(RMSE=sqrt(mean((rf_pred-meancon)^2))/mean(meancon))
 
 
@@ -510,7 +519,7 @@ as.data.frame(fitt_rf$finalModel$importance) |>
   mutate("variable"=row.names(fitt_rf$finalModel$importance)) |> 
   arrange(desc(IncNodePurity))
 
-rf_mod <- randomForest::randomForest(fitt_rf$finalModel$param, data=df_gen)
+#rf_mod <- randomForest::randomForest(fitt_rf$finalModel$param, data=df_gen)
 
 library(randomForest)
 

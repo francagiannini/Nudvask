@@ -66,7 +66,7 @@ df_gen <-
     #"Y",
     #"geometry",
     #"Id",
-    #"afstro_sum_month" ,
+    "afstro_sum_month" ,
     "Precip_sum_month" ,
     "AirTemp_ave_month"  ,
     "Globrad_ave_month" ,
@@ -345,22 +345,79 @@ linear_translate <- lmer(
   log(meancon)~month+month2+month3+
     afstro_cumsumhy+afstro_cumsumhy2+afstro_cumsumhy3+
     N_mineral_spring+Precip_sum365+
-    Winter_nles5+clay_cat+
+    Winter_nles5*afstro_cumsumhy2+
+    Winter_nles5+clay_cat+N_org_year+Globrad_avehy+
     month:clay_cat+month2:clay_cat+month3:clay_cat+(1|harvest_year),
   data = df_gen)
 
 summary(linear_translate)
 
-df_gen$lin_pred <- predict(linear_translate, df_gen)
+df_gen$lin_pred <- exp(predict(linear_translate, df_gen))
 
 df_gen |> filter(!Winter_nles5==7) |> 
-  ggplot(aes(y=exp(lin_pred), x=month)) + 
+  ggplot(aes(y=lin_pred, x=month)) + 
   geom_boxplot(alpha=.3, aes(group=as.factor(month), 
                              col = season)) + 
   geom_smooth(alpha=0.3, col="gray40")+
   facet_grid(clay_cat ~Winter_nles5
              , scale="free") +
   scale_x_discrete(name = NULL, breaks = NULL)
+
+df_gen |> filter(!Winter_nles5==7) |> 
+  ggplot(aes(y=exp(lin_pred), x=afstro_cumsumhy)) + 
+  geom_point(alpha=.3, aes(#group=as.factor(month), 
+                             col = season)) + 
+  geom_smooth(alpha=0.3, col="gray40")+
+  facet_grid(clay_cat ~Winter_nles5
+             , scale="free") +
+  scale_x_discrete(name = NULL, breaks = NULL)
+
+ plot(exp(df_gen$lin_pred),df_gen$meancon)
+ 
+ 
+ linear_translate_simp <- lmer(
+   log(meancon)~
+     afstro_cumsumhy+afstro_cumsumhy2+afstro_cumsumhy3+
+     N_mineral_spring+Precip_sum365+
+     clay_cat+
+     afstro_cumsumhy:clay_cat+afstro_cumsumhy2:clay_cat+afstro_cumsumhy3:clay_cat+
+     (1|harvest_year),
+   data = df_gen)
+
+summary(linear_translate_simp)
+
+df_gen <- df_gen |> 
+  mutate(leach_obs=meancon*afstro_sum_month,
+         leach_rf=rf_pred*afstro_sum_month,
+         leach_lm=lin_pred*afstro_sum_month)
+
+df_gen |> select(leach_obs,leach_rf,leach_lm) |> cor() |> corrplot::corrplot.mixed()
+corr_plot()
+
+saveRDS(df_gen, "df_gen0809.RDS")
+
+df_gen |> 
+  filter(!Winter_nles5==7) |> 
+  filter(!Winter_nles5==8) |>
+  #filter(Main_nles5==1 & Winter_nles5 == 4 & harvest_year== c(1998,1999,2008))|> 
+  #select(month, rf_pred, meancon,jbnr,harvest_year,clay_cat) |> 
+  pivot_longer(cols=c(leach_obs,leach_rf,leach_lm), 
+               values_to = "Nleaching", names_to = "Measurement") |> 
+  ggplot(aes(x=month,y=Nleaching,fill=Measurement, col=Measurement))+
+  geom_boxplot(alpha=.1, aes(group=interaction(Measurement,month), fill=Measurement
+  ) )+
+  scale_color_manual(values=c("#999999", "#E69F00", "#9467bd"))+
+  scale_fill_manual(values=c("#999999", "#E69F00", "#9467bd"))+
+  geom_smooth(alpha=0.3, aes(linetype=Measurement))+
+  geom_point(alpha=0.2, size=0.1)+
+  facet_grid(Winter_nles5~clay_cat)+
+  theme_bw()+
+  scale_y_continuous(limits = c(-5,3000))+
+  
+  scale_x_continuous(breaks = seq(1,12,1))+
+  theme(legend.position = "bottom", panel.background = NULL)
+
+
 
 # no_modG_pred <- cbind(CO2_modG_pred,
 #                     predict(CO2_modG, 

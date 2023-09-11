@@ -257,7 +257,7 @@ table(df_monthly$crop_winter_name,df_monthly$harvest_year) |>
 
 # DMI ----
 fnames <- as.list(paste(
-  "O:\\Tech_AGRO\\Jornaer\\Franca\\N_conc\\10kmgridnew_geusprec22\\", 
+  "O:\\Tech_AGRO\\Jornaer\\Franca\\N_conc\\10kmgridnew_geusprec23\\", 
   unique(df_monthly$DMIGRIDNUM[which(!is.na(df_monthly$DMIGRIDNUM))]),
   "8022", 
   ".dwf", 
@@ -590,9 +590,9 @@ db <-
 
 colnames(db)<-gsub(".x","",colnames(db))    
 
-write.table(db, "data_preproc/db_Nmonthly_cut_3107.txt", sep = "\t")
+write.table(db, "data_preproc/db_Nmonthly_cut_0809.txt", sep = "\t")
 
 writexl::write_xlsx(db,
-                    "data_preproc/db_Nmonthly_cut_3107.xlsx",# sep = "\t",
+                    "data_preproc/db_Nmonthly_cut_0809.xlsx",# sep = "\t",
                     col_names = TRUE,
                     format_headers = TRUE)
