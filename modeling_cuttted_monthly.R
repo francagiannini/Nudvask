@@ -19,32 +19,32 @@ library(tmap)
 
 # data ----
 
-df_m <- read.table("data_preproc/db_Nmonthly_cut_0809.txt",
-                   sep ="\t", dec=".")|>
-  mutate(prev_Main_nles5=as.factor(prev_Main_nles5),
-         prev_Winter_nles5=as.factor(prev_Winter_nles5) ,
-         Main_nles5=as.factor(Main_nles5) ,
-         Winter_nles5=as.factor(Winter_nles5),
-         jbnr=as.factor(jbnr),
-         Gamma=as.factor(Gamma),
-         WC=as.factor(WC)
-  )
-
-summary(df_m)
-md.pattern(df_m)
-
-imputation_list <- mice(df_m,
-                        method = "rf",
-                        m=5)  # "pmm" == predictive mean matching (numeric data)
-
-
-#plot(df_m$Clay)
-
-df_m_imp <- complete(imputation_list) |>
-  mutate(clay_cat=cut(clay,c(-Inf,6,10, Inf),
-                      labels=c("low","middle","high")))
-
-saveRDS(df_m_imp, "df_m_imp.RDS")
+# df_m <- read.table("data_preproc/db_Nmonthly_cut_0809.txt",
+#                    sep ="\t", dec=".")|>
+#   mutate(prev_Main_nles5=as.factor(prev_Main_nles5),
+#          prev_Winter_nles5=as.factor(prev_Winter_nles5) ,
+#          Main_nles5=as.factor(Main_nles5) ,
+#          Winter_nles5=as.factor(Winter_nles5),
+#          jbnr=as.factor(jbnr),
+#          Gamma=as.factor(Gamma),
+#          WC=as.factor(WC)
+#   )
+# 
+# summary(df_m)
+# md.pattern(df_m)
+# 
+# imputation_list <- mice(df_m,
+#                         method = "rf",
+#                         m=5)  # "pmm" == predictive mean matching (numeric data)
+# 
+# 
+# #plot(df_m$Clay)
+# 
+# df_m_imp <- complete(imputation_list) |>
+#   mutate(clay_cat=cut(clay,c(-Inf,6,10, Inf),
+#                       labels=c("low","middle","high")))
+# 
+# saveRDS(df_m_imp, "df_m_imp.RDS")
 
 df_m_imp <- readRDS("df_m_imp.RDS")
   
@@ -161,8 +161,8 @@ fil_df_m_imp <- df_m_imp |> dplyr::filter(ident==2702)
 
 # feature selection ----
 
-df_m_imp <- readRDS(
-  "C:/Users/au710823/OneDrive - Aarhus universitet/NLESS2022Fran/NLESSdata/Nudvask/Nudvask/df_m_imp.RDS")
+# df_m_imp <- readRDS(
+#   "C:/Users/au710823/OneDrive - Aarhus universitet/NLESS2022Fran/NLESSdata/Nudvask/Nudvask/df_m_imp.RDS")
 
 df_gen <-
   df_m_imp |>
@@ -187,8 +187,8 @@ df_gen <-
     #"N_from_grassing_animals",
     #"N_topsoil",
     #"clay",
-    "Gamma",
-    "jbnr",
+    #"Gamma",
+    #"jbnr",
     "prev_Main_nles5",
     "prev_Winter_nles5",
     "Main_nles5",
@@ -210,7 +210,7 @@ df_gen <-
     #"Y",
     #"geometry",
     #"Id",
-    #"afstro_sum_month" ,
+    "afstro_sum_month" ,
     "Precip_sum_month" ,
     "AirTemp_ave_month"  ,
     "Globrad_ave_month" ,
@@ -346,8 +346,8 @@ param_gbm <-  expand.grid(
 #Timedf = data.frame(time="")
 #stime = data.frame(stime)
 
-Mycluster = makeCluster(detectCores()-2)
-registerDoParallel(Mycluster)
+
+
 
 control <- trainControl(method = "cv",#"repeatedcv",
                         number = 2,
@@ -355,7 +355,7 @@ control <- trainControl(method = "cv",#"repeatedcv",
                         allowParallel = TRUE
 )
 
-remotes::install_github("gbm-developers/gbm")
+#remotes::install_github("gbm-developers/gbm")
 
 # gbm()
 
@@ -600,4 +600,86 @@ summary(gamm)
 plot(gamm)
 
 sqrt(mean((gamm$fitted.values-log(df_gen$meancon))^2))/mean(log(df_gen$meancon))* 100
+
+
+# random forest simplifying ----
+
+library(randomForest)
+
+Mycluster = makeCluster(detectCores()-2)
+registerDoParallel(Mycluster)
+
+
+## full ----
+df_gen_full <- df_gen |> 
+  select(!c(site_eng, harvest_year)) |>
+  drop_na()
+
+df_gen_full <- df_gen_full[complete.cases(df_gen_full),] |>  
+  sample_frac(0.2) |> filter(!Winter_nles5==7)
+
+# train model
+fitControl <- trainControl(
+  ## 10-fold CV
+  method = "repeatedcv",
+  number = 10,
+  ## repeated ten times
+  repeats = 3)
+
+#create tunegrid
+tunegrid <- expand.grid(.mtry = seq(5,10,5))
+
+                        
+
+#train with different ntree parameters
+ 
+rffit_full <- caret::train(
+  log(meancon) ~month+ WC +N_mineral_spring+ N_min_year.1 +N_min_year.2 +N_f_year, #.,
+  data = df_gen_full,
+  method = 'gbm',
+  #preProc = c("center", "scale"),
+  #tuneGrid = tunegrid,
+  metric = 'RMSE',
+  #ntree = seq(1000, 10000, 1000),
+  #trControl = fitControl,
+  verbose = FALSE,
+  trace = FALSE)
+
+
+#Compare results
+
+summary(rffit_full)
+
+plot(rffit_full)
+
+saveRDS(rffit_full,"rffit_full.RDS")
+
+## full independent ----
+
+df_gen_full_ind <- df_gen |> 
+  select(!c(site_eng, harvest_year,
+            afstro_sum_month,afstro_cumsumhy,afstro_sumhy)) |>
+  drop_na()
+
+rffit_full_ind_out <- caret::train(
+  log(meancon) ~ .,
+  data = df_gen_full_ind,
+  method = 'rf',
+  preProc = c("center", "scale"),
+  tuneGrid = tunegrid,
+  metric = 'RMSE',
+  ntree = seq(1000, 10000, 1000),
+  trControl = control,
+  verbose = FALSE,
+  trace = FALSE)
+
+
+
+
+
+
+df_gen <- cbind(df_gen,
+                "rf_pred"=as.data.frame(exp(fitt_rf$finalModel$predicted))[,1]#,
+                #as.data.frame(exp(fitt_gbm$finalModel$fit))[,1]
+)
 
