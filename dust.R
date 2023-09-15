@@ -37,11 +37,24 @@ model <- randomForest(
   importance = TRUE
 )
 
+# train model
+fitControl <- trainControl(
+  ## 10-fold CV
+  method = "repeatedcv",
+  number = 10,
+  ## repeated ten times
+  repeats = 3)
+
+#create tunegrid
+tunegrid <- expand.grid(.mtry = seq(2,6,1))
+
 
 model <- caret::train(
-  formula = medv ~ .,
-  method= "lm",
+  medv ~ .,#crim+ zn +indus+ chas   +nox   + rm  +age + +  dis+ rad +tax +ptratio + black+ lsta,
+  method= "rf",
   data = training_data,
+  trControl=fitControl, 
+  tuneGrid = tunegrid,
   #ntree = 500,
   #mtry = 2,
   importance = TRUE
