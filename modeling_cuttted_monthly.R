@@ -459,6 +459,7 @@ fitt_rf <- caret::train(
 
 saveRDS(fitt_rf,"fitt_rf.RDS")
 
+fitt_rf <- readRDS("fitt_rf.RDS")
 
 df_gen <- cbind(df_gen,
                  "rf_pred"=as.data.frame(exp(fitt_rf$finalModel$predicted))[,1]#,
